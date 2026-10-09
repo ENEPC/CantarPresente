@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Roadmap de Desarrollo del Proyecto - Sembrar Cantando</title>
+<style>
+  body {
+    font-family: 'Segoe UI', Calibri, Arial, sans-serif;
+    color: #1e293b;
+    background-color: #f8fafc;
+    margin: 0;
+    padding: 30px;
+  }
+  .container {
+    max-width: 1100px;
+    margin: 0 auto;
+    background: #ffffff;
+    padding: 35px 45px;
+    border-radius: 12px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.06);
+  }
+  h1 {
+    color: #0f172a;
+    font-size: 24px;
+    margin-bottom: 6px;
+    border-bottom: 3px solid #2563eb;
+    padding-bottom: 12px;
+  }
+  .subtitle {
+    font-size: 14px;
+    color: #64748b;
+    margin-bottom: 25px;
+  }
+  /* Roadmap Cards / Pipeline */
+  .timeline {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 35px;
+  }
+  .stage-card {
+    flex: 1;
+    background: #f1f5f9;
+    border-radius: 8px;
+    border-top: 5px solid #2563eb;
+    padding: 14px 12px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.04);
+  }
+  .stage-card:nth-child(2) { border-top-color: #0284c7; }
+  .stage-card:nth-child(3) { border-top-color: #0d9488; }
+  .stage-card:nth-child(4) { border-top-color: #f59e0b; }
+  .stage-card:nth-child(5) { border-top-color: #10b981; }
+
+  .stage-header {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: #64748b;
+    margin-bottom: 4px;
+  }
+  .stage-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: #0f172a;
+    min-height: 38px;
+    margin-bottom: 10px;
+    line-height: 1.3;
+  }
+  .stage-points {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    font-size: 11.5px;
+    color: #334155;
+    line-height: 1.45;
+  }
+  .stage-points li {
+    margin-bottom: 6px;
+    padding-left: 12px;
+    position: relative;
+  }
+  .stage-points li::before {
+    content: "•";
+    position: absolute;
+    left: 0;
+    color: #2563eb;
+    font-weight: bold;
+  }
+
+  /* Tabla Formal */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 15px;
+    font-size: 12.5px;
+  }
+  th {
+    background-color: #1e293b;
+    color: #ffffff;
+    text-align: left;
+    padding: 10px 14px;
+    font-weight: 600;
+  }
+  td {
+    padding: 12px 14px;
+    border-bottom: 1px solid #e2e8f0;
+    vertical-align: top;
+    line-height: 1.45;
+  }
+  tr:nth-child(even) td {
+    background-color: #f8fafc;
+  }
+  .badge {
+    display: inline-block;
+    background-color: #e0e7ff;
+    color: #3730a3;
+    padding: 3px 7px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <h1>Roadmap de Desarrollo del Proyecto: Sembrar Cantando</h1>
+  <div class="subtitle">Estructura iterativa e incremental en 5 fases hacia el despliegue del sistema digital</div>
+
+  <!-- Vista Horizontal tipo Diapositiva / Tarjetas -->
+  <div class="timeline">
+    <div class="stage-card">
+      <div class="stage-header">Mes 1 · Semanas 1 a 4</div>
+      <div class="stage-title">Iteración 1: Registro de Participantes</div>
+      <ul class="stage-points">
+        <li>Relevamiento de datos requeridos.</li>
+        <li>Diseño de pantallas ABM.</li>
+        <li>Almacenamiento local de datos.</li>
+        <li>Funcionalidad de alta y consulta.</li>
+      </ul>
+    </div>
+
+    <div class="stage-card">
+      <div class="stage-header">Mes 2 · Semanas 5 a 8</div>
+      <div class="stage-title">Iteración 2: Gestión de Coros y Sedes</div>
+      <ul class="stage-points">
+        <li>Estructura de grupos y actividades.</li>
+        <li>Asignación de alumnos a sedes.</li>
+        <li>Módulo de coros y sedes activo.</li>
+        <li>Integración con el padrón base.</li>
+      </ul>
+    </div>
+
+    <div class="stage-card">
+      <div class="stage-header">Mes 3 · Semanas 9 a 12</div>
+      <div class="stage-title">Iteración 3: Registro de Asistencia</div>
+      <ul class="stage-points">
+        <li>Relevamiento del circuito de aula.</li>
+        <li>Diseño de interfaz PWA móvil.</li>
+        <li>Mecanismo Offline-First activo.</li>
+        <li>Pruebas operativas sin conexión.</li>
+      </ul>
+    </div>
+
+    <div class="stage-card">
+      <div class="stage-header">Mes 4 · Semanas 13 a 16</div>
+      <div class="stage-title">Iteración 4: Reportes e Indicadores</div>
+      <ul class="stage-points">
+        <li>Definición de KPIs institucionales.</li>
+        <li>Reportes de presentismo y coros.</li>
+        <li>Visualizaciones y gráficos.</li>
+        <li>Exportación para la dirección.</li>
+      </ul>
+    </div>
+
+    <div class="stage-card">
+      <div class="stage-header">Mes 5 · Semanas 17 a 20</div>
+      <div class="stage-title">Iteración 5: Sincronización y Salida</div>
+      <ul class="stage-points">
+        <li>Conexión con APIs REST en Vercel.</li>
+        <li>Sincronización con PostgreSQL.</li>
+        <li>Manejo y resolución de conflictos.</li>
+        <li>Despliegue y capacitación final.</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Vista Tabla Detallada -->
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 18%;">Iteración / Período</th>
+        <th style="width: 44%;">Acciones y Tareas Clave</th>
+        <th style="width: 38%;">Resultado / Hito Entregable</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>
+          <span class="badge">Mes 1 (Sem. 1-4)</span><br>
+          <strong>Iteración 1:</strong> Registro de participantes
+        </td>
+        <td>
+          • Relevar y definir los datos necesarios de los participantes.<br>
+          • Diseñar la interfaz para el alta, consulta y modificación.<br>
+          • Implementar el almacenamiento local de los datos.<br>
+          • Desarrollar la funcionalidad de registro y consulta.
+        </td>
+        <td>
+          Módulo de padrón base operativo para dar de alta, consultar y editar participantes de forma local.
+        </td>
+      </tr>
+      <tr>
+        <td>
+          <span class="badge">Mes 2 (Sem. 5-8)</span><br>
+          <strong>Iteración 2:</strong> Gestión de coros y sedes
+        </td>
+        <td>
+          • Definir la estructura de grupos, sedes y actividades.<br>
+          • Diseñar la asignación de participantes a coros y sedes.<br>
+          • Implementar las funcionalidades correspondientes.<br>
+          • Integrarlas con el registro de participantes.
+        </td>
+        <td>
+          Estructura organizacional configurada, con participantes clasificados y vinculados a sus respectivos grupos.
+        </td>
+      </tr>
+      <tr>
+        <td>
+          <span class="badge">Mes 3 (Sem. 9-12)</span><br>
+          <strong>Iteración 3:</strong> Registro y seguimiento de asistencia
+        </td>
+        <td>
+          • Analizar el proceso actual de registro de asistencia en aula.<br>
+          • Diseñar una interfaz sencilla para dispositivos móviles.<br>
+          • Implementar el registro y consulta de asistencia.<br>
+          • Incorporar funcionamiento Offline-First con almacenamiento local y realizar pruebas sin Internet.
+        </td>
+        <td>
+          PWA móvil funcional para celulares que permite registrar el presentismo en ensayos sin depender de conectividad.
+        </td>
+      </tr>
+      <tr>
+        <td>
+          <span class="badge">Mes 4 (Sem. 13-16)</span><br>
+          <strong>Iteración 4:</strong> Reportes e indicadores
+        </td>
+        <td>
+          • Definir los indicadores relevantes para la organización.<br>
+          • Implementar reportes sobre participantes, actividades y participación.<br>
+          • Incorporar visualizaciones que permitan interpretar la información.<br>
+          • Permitir la generación o exportación de reportes institucionales.
+        </td>
+        <td>
+          Panel administrativo con gráficos de asistencia, métricas de retención y capacidad de exportar informes para la ONG.
+        </td>
+      </tr>
+      <tr>
+        <td>
+          <span class="badge">Mes 5 (Sem. 17-20)</span><br>
+          <strong>Iteración 5:</strong> Sincronización y puesta en producción
+        </td>
+        <td>
+          • Implementar la comunicación con las APIs REST.<br>
+          • Incorporar la sincronización de datos locales con PostgreSQL.<br>
+          • Resolver conflictos y validar la consistencia de los datos.<br>
+          • Desplegar la aplicación y capacitar a los usuarios de la organización.
+        </td>
+        <td>
+          Sistema integral en producción en la nube, sincronización bidireccional activa y personal capacitado para el uso diario.
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+</body>
+</html>

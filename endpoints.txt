@@ -1,0 +1,30 @@
+Sincronización y Asistencia
+GET /api/bootstrap
+
+Trae la lista inicial completa de coros y alumnos para guardarla en el dispositivo al inicio.
+
+POST /api/attendances/sync
+
+Recibe el lote de asistencias que se tomaron sin internet y las impacta juntas en la base de datos.
+
+GET /api/attendances
+
+Consulta el historial registrado para ver asistencias pasadas o armar reportes.
+
+Gestión de Alumnos
+POST /api/students
+
+Crea un nuevo participante.
+
+PUT /api/students/:id
+
+Modifica los datos de un alumno existente (o actualiza sus coros asignados y su estado activo/inactivo).
+
+Gestión de Coros y Sedes
+POST /api/choirs
+
+Crea un coro/sede nuevo.
+
+PUT /api/choirs/:id
+
+Edita el nombre, lugar o día/horario de un coro existente.
