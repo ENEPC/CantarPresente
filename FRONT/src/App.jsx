@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Header from './components/Header';
 import Navbar from './components/Navbar';
 import AttendanceView from './components/AttendanceView';
@@ -8,63 +8,47 @@ import HistoryView from './components/HistoryView';
 import StudentModal from './components/StudentModal';
 import ChoirModal from './components/ChoirModal';
 import { INITIAL_CHOIRS, INITIAL_STUDENTS } from './data/initialData';
+import { KEYS, leerJson, guardarJson, migrarStorage, pedirPersistencia } from './lib/storage';
+import { enqueue } from './lib/outbox';
+import { useSync, construirLote } from './lib/sync';
+import { useOnline } from './lib/useOnline';
+
+migrarStorage();
 
 export default function App() {
   const [currentTab, setCurrentTab] = useState('attendance');
 
-  // Estado y persistencia de Coros
-  const [choirs, setChoirs] = useState(() => {
-    try {
-      const saved = localStorage.getItem('cp_choirs');
-      if (saved && saved !== 'undefined') {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
-    } catch (e) {
-      console.error('Error al leer coros de localStorage:', e);
-    }
-    return INITIAL_CHOIRS || [];
+  // Estado local (fuente de verdad mientras no hay conexión)
+  const [choirs, setChoirs] = useState(() => leerJson(KEYS.choirs, INITIAL_CHOIRS));
+  const [students, setStudents] = useState(() => leerJson(KEYS.students, INITIAL_STUDENTS));
+  const [attendances, setAttendances] = useState(() => leerJson(KEYS.attendances, []));
+
+  useEffect(() => guardarJson(KEYS.choirs, choirs), [choirs]);
+  useEffect(() => guardarJson(KEYS.students, students), [students]);
+  useEffect(() => guardarJson(KEYS.attendances, attendances), [attendances]);
+
+  const online = useOnline();
+  const { pendientes, errores, sincronizando, sincronizar } = useSync({
+    setChoirs,
+    setStudents,
+    setAttendances,
   });
 
+  // Al montar: pedir almacenamiento persistente y, si hay conexión, sincronizar.
   useEffect(() => {
-    localStorage.setItem('cp_choirs', JSON.stringify(choirs));
-  }, [choirs]);
+    pedirPersistencia();
+    if (navigator.onLine) sincronizar();
+  }, [sincronizar]);
 
-  // Estado y persistencia de Alumnos
-  const [students, setStudents] = useState(() => {
-    try {
-      const saved = localStorage.getItem('cp_students');
-      if (saved && saved !== 'undefined') {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
-    } catch (e) {
-      console.error('Error al leer alumnos de localStorage:', e);
+  // Al recuperar la conexión, drenar la cola (sin repetir en el montaje).
+  const primerRender = useRef(true);
+  useEffect(() => {
+    if (primerRender.current) {
+      primerRender.current = false;
+      return;
     }
-    return INITIAL_STUDENTS || [];
-  });
-
-  useEffect(() => {
-    localStorage.setItem('cp_students', JSON.stringify(students));
-  }, [students]);
-
-  // Estado y persistencia de Asistencias
-  const [attendances, setAttendances] = useState(() => {
-    try {
-      const saved = localStorage.getItem('cp_attendances');
-      if (saved && saved !== 'undefined') {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) return parsed;
-      }
-    } catch (e) {
-      console.error('Error al leer asistencias de localStorage:', e);
-    }
-    return [];
-  });
-
-  useEffect(() => {
-    localStorage.setItem('cp_attendances', JSON.stringify(attendances));
-  }, [attendances]);
+    if (online) sincronizar();
+  }, [online, sincronizar]);
 
   // Modales
   const [isStudentModalOpen, setIsStudentModalOpen] = useState(false);
@@ -72,36 +56,48 @@ export default function App() {
   const [isChoirModalOpen, setIsChoirModalOpen] = useState(false);
   const [editingChoir, setEditingChoir] = useState(null);
 
-  // Handlers Alumnos
-  const handleSaveStudent = (studentData) => {
+  // Handlers Alumnos: local-first (estado + persistencia) y encolar para el sync
+  const handleSaveStudent = (alumno) => {
     if (editingStudent) {
-      setStudents(students.map((s) => (s.id === studentData.id ? studentData : s)));
+      setStudents((prev) => prev.map((s) => (s.id === alumno.id ? alumno : s)));
+      enqueue('editarAlumno', alumno);
     } else {
-      setStudents([...students, studentData]);
+      setStudents((prev) => [...prev, alumno]);
+      enqueue('crearAlumno', alumno);
     }
+    if (navigator.onLine) sincronizar();
   };
 
   const handleToggleStudentStatus = (studentId) => {
-    setStudents(
-      students.map((s) => (s.id === studentId ? { ...s, active: !s.active } : s))
-    );
+    const actualizado = students.find((s) => s.id === studentId);
+    if (!actualizado) return;
+    const conEstado = {
+      ...actualizado,
+      activo: !actualizado.activo,
+      updatedAt: new Date().toISOString(),
+    };
+    setStudents((prev) => prev.map((s) => (s.id === studentId ? conEstado : s)));
+    enqueue('editarAlumno', conEstado);
+    if (navigator.onLine) sincronizar();
   };
 
   // Handlers Coros
-  const handleSaveChoir = (choirData) => {
+  const handleSaveChoir = (coro) => {
     if (editingChoir) {
-      setChoirs(choirs.map((c) => (c.id === choirData.id ? choirData : c)));
+      setChoirs((prev) => prev.map((c) => (c.id === coro.id ? coro : c)));
+      enqueue('editarCoro', coro);
     } else {
-      setChoirs([...choirs, choirData]);
+      setChoirs((prev) => [...prev, coro]);
+      enqueue('crearCoro', coro);
     }
+    if (navigator.onLine) sincronizar();
   };
 
   const handleDeleteChoir = (choirId) => {
     // Comprobar si algún alumno tiene este coro en sus asignaciones
-    const assignedStudents = students.filter((s) => {
-      const cIds = Array.isArray(s.choirIds) ? s.choirIds : [s.choirId];
-      return cIds.map(Number).includes(Number(choirId));
-    });
+    const assignedStudents = students.filter((s) =>
+      (Array.isArray(s.coroIds) ? s.coroIds : []).includes(choirId)
+    );
 
     if (assignedStudents.length > 0) {
       alert(
@@ -115,21 +111,39 @@ export default function App() {
     );
 
     if (confirmDelete) {
-      setChoirs(choirs.filter((c) => c.id !== Number(choirId)));
+      const coro = choirs.find((c) => c.id === choirId);
+      if (coro) {
+        const dadoDeBaja = {
+          ...coro,
+          activo: false,
+          updatedAt: new Date().toISOString(),
+        };
+        enqueue('editarCoro', dadoDeBaja);
+      }
+      setChoirs((prev) => prev.filter((c) => c.id !== choirId));
+      if (navigator.onLine) sincronizar();
     }
   };
 
   // Handler Asistencia
-  const handleSaveAttendance = (choirId, date, records) => {
-    const updated = attendances.filter(
-      (a) => !(a.choirId === choirId && a.date === date)
-    );
-    setAttendances([...updated, { choirId, date, records }]);
+  const handleSaveAttendance = (clase) => {
+    setAttendances((prev) => [
+      ...prev.filter((a) => !(a.coroId === clase.coroId && a.fecha === clase.fecha)),
+      clase,
+    ]);
+    enqueue('syncAsistencia', { claseId: clase.id, lote: construirLote(clase) });
+    if (navigator.onLine) sincronizar();
   };
 
   return (
     <div className="min-w-[320px] max-w-md mx-auto min-h-screen bg-slate-50 flex flex-col font-sans pb-20">
-      <Header />
+      <Header
+        online={online}
+        pendientes={pendientes}
+        errores={errores}
+        sincronizando={sincronizando}
+        onSync={sincronizar}
+      />
 
       <main className="flex-1 p-4">
         {currentTab === 'attendance' && (

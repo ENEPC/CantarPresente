@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { newUuid } from '../lib/ids.js';
 
 export default function StudentModal({
   isOpen,
@@ -7,59 +8,59 @@ export default function StudentModal({
   choirs = [],
   editingStudent = null,
 }) {
-  const [name, setName] = useState('');
-  const [lastname, setLastname] = useState('');
-  const [tutor, setTutor] = useState('');
+  const [nombre, setNombre] = useState('');
+  const [apellido, setApellido] = useState('');
+  const [responsableNombre, setResponsableNombre] = useState('');
+  const [responsableTelefono, setResponsableTelefono] = useState('');
   const [selectedChoirIds, setSelectedChoirIds] = useState([]);
 
   useEffect(() => {
     if (editingStudent) {
-      setName(editingStudent.name || '');
-      setLastname(editingStudent.lastname || '');
-      setTutor(editingStudent.tutor || '');
-
-      // Compatibilidad: si ya tenía array choirIds o el choirId numérico inicial
-      if (Array.isArray(editingStudent.choirIds)) {
-        setSelectedChoirIds(editingStudent.choirIds.map(Number));
-      } else if (editingStudent.choirId) {
-        setSelectedChoirIds([Number(editingStudent.choirId)]);
-      } else {
-        setSelectedChoirIds([]);
-      }
+      setNombre(editingStudent.nombre || '');
+      setApellido(editingStudent.apellido || '');
+      setResponsableNombre(editingStudent.responsableNombre || '');
+      setResponsableTelefono(editingStudent.responsableTelefono || '');
+      setSelectedChoirIds(Array.isArray(editingStudent.coroIds) ? editingStudent.coroIds : []);
     } else {
-      setName('');
-      setLastname('');
-      setTutor('');
-      setSelectedChoirIds(choirs[0] ? [Number(choirs[0].id)] : []);
+      setNombre('');
+      setApellido('');
+      setResponsableNombre('');
+      setResponsableTelefono('');
+      setSelectedChoirIds(choirs[0] ? [choirs[0].id] : []);
     }
   }, [editingStudent, isOpen, choirs]);
 
   if (!isOpen) return null;
 
   const handleToggleChoir = (id) => {
-    const numId = Number(id);
     setSelectedChoirIds((prev) =>
-      prev.includes(numId) ? prev.filter((cId) => cId !== numId) : [...prev, numId]
+      prev.includes(id) ? prev.filter((cId) => cId !== id) : [...prev, id]
     );
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!name.trim() || !lastname.trim()) {
+    if (!nombre.trim() || !apellido.trim()) {
       return alert('El nombre y apellido son obligatorios.');
     }
     if (selectedChoirIds.length === 0) {
       return alert('Debés asignar al participante a por lo menos un coro o sede.');
     }
 
+    const ahora = new Date().toISOString();
     onSave({
-      id: editingStudent ? editingStudent.id : Date.now(),
-      name: name.trim(),
-      lastname: lastname.trim(),
-      tutor: tutor.trim(),
-      choirIds: selectedChoirIds,
-      choirId: selectedChoirIds[0], // Compatibilidad con vistas simples
-      active: editingStudent ? editingStudent.active : true,
+      id: editingStudent ? editingStudent.id : newUuid(),
+      nombre: nombre.trim(),
+      apellido: apellido.trim(),
+      fechaNacimiento: editingStudent?.fechaNacimiento ?? null,
+      responsableNombre: responsableNombre.trim() || null,
+      responsableTelefono: responsableTelefono.trim() || null,
+      observaciones: editingStudent?.observaciones ?? null,
+      activo: editingStudent ? editingStudent.activo : true,
+      coroIds: selectedChoirIds,
+      createdAt: editingStudent?.createdAt ?? ahora,
+      updatedAt: ahora,
+      deletedAt: editingStudent?.deletedAt ?? null,
     });
     onClose();
   };
@@ -78,8 +79,8 @@ export default function StudentModal({
               type="text"
               required
               placeholder="Ej: Mateo"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
+              value={nombre}
+              onChange={(e) => setNombre(e.target.value)}
               className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 focus:bg-white"
             />
           </div>
@@ -90,19 +91,34 @@ export default function StudentModal({
               type="text"
               required
               placeholder="Ej: Gómez"
-              value={lastname}
-              onChange={(e) => setLastname(e.target.value)}
+              value={apellido}
+              onChange={(e) => setApellido(e.target.value)}
               className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 focus:bg-white"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-600 mb-1">Tutor / Contacto</label>
+            <label className="block text-xs font-semibold text-slate-600 mb-1">
+              Responsable / Contacto
+            </label>
             <input
               type="text"
               placeholder="Ej: Rosa Gómez"
-              value={tutor}
-              onChange={(e) => setTutor(e.target.value)}
+              value={responsableNombre}
+              onChange={(e) => setResponsableNombre(e.target.value)}
+              className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 focus:bg-white"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-600 mb-1">
+              Teléfono del Responsable
+            </label>
+            <input
+              type="tel"
+              placeholder="Ej: 11-5555-1234"
+              value={responsableTelefono}
+              onChange={(e) => setResponsableTelefono(e.target.value)}
               className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 focus:bg-white"
             />
           </div>
@@ -113,7 +129,7 @@ export default function StudentModal({
             </label>
             <div className="space-y-1.5 max-h-36 overflow-y-auto border border-slate-200 rounded-lg p-2 bg-slate-50">
               {choirs.map((choir) => {
-                const isChecked = selectedChoirIds.includes(Number(choir.id));
+                const isChecked = selectedChoirIds.includes(choir.id);
                 return (
                   <label
                     key={choir.id}
@@ -126,7 +142,7 @@ export default function StudentModal({
                       className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500"
                     />
                     <span className="text-xs text-slate-700 font-medium">
-                      {choir.name}
+                      {choir.nombre}
                     </span>
                   </label>
                 );

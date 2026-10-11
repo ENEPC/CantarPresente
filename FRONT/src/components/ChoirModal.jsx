@@ -1,19 +1,37 @@
 import { useState, useEffect } from 'react';
+import { newUuid } from '../lib/ids.js';
+
+const DIAS = [
+  ['', 'Sin día fijo'],
+  ['lunes', 'Lunes'],
+  ['martes', 'Martes'],
+  ['miercoles', 'Miércoles'],
+  ['jueves', 'Jueves'],
+  ['viernes', 'Viernes'],
+  ['sabado', 'Sábado'],
+  ['domingo', 'Domingo'],
+];
 
 export default function ChoirModal({ isOpen, onClose, onSave, editingChoir }) {
-  const [name, setName] = useState('');
-  const [venue, setVenue] = useState('');
-  const [schedule, setSchedule] = useState('');
+  const [nombre, setNombre] = useState('');
+  const [sedeNombre, setSedeNombre] = useState('');
+  const [sedeLocalidad, setSedeLocalidad] = useState('');
+  const [diaSemana, setDiaSemana] = useState('');
+  const [horario, setHorario] = useState('');
 
   useEffect(() => {
     if (editingChoir) {
-      setName(editingChoir.name || '');
-      setVenue(editingChoir.venue || editingChoir.location || '');
-      setSchedule(editingChoir.schedule || '');
+      setNombre(editingChoir.nombre || '');
+      setSedeNombre(editingChoir.sede?.nombre || '');
+      setSedeLocalidad(editingChoir.sede?.localidad || '');
+      setDiaSemana(editingChoir.diaSemana || '');
+      setHorario(editingChoir.horario || '');
     } else {
-      setName('');
-      setVenue('');
-      setSchedule('');
+      setNombre('');
+      setSedeNombre('');
+      setSedeLocalidad('');
+      setDiaSemana('');
+      setHorario('');
     }
   }, [editingChoir, isOpen]);
 
@@ -21,14 +39,25 @@ export default function ChoirModal({ isOpen, onClose, onSave, editingChoir }) {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!name.trim()) return;
+    if (!nombre.trim()) return;
+    if (!sedeNombre.trim()) {
+      return alert('El nombre de la sede es obligatorio.');
+    }
 
+    const ahora = new Date().toISOString();
     onSave({
-      id: editingChoir ? editingChoir.id : Date.now(),
-      name: name.trim(),
-      venue: venue.trim(),
-      location: venue.trim(),
-      schedule: schedule.trim(),
+      id: editingChoir ? editingChoir.id : newUuid(),
+      nombre: nombre.trim(),
+      activo: editingChoir ? editingChoir.activo : true,
+      diaSemana: diaSemana || null,
+      horario: horario || null,
+      sede: {
+        nombre: sedeNombre.trim(),
+        localidad: sedeLocalidad.trim() || null,
+      },
+      createdAt: editingChoir?.createdAt ?? ahora,
+      updatedAt: ahora,
+      deletedAt: editingChoir?.deletedAt ?? null,
     });
     onClose();
   };
@@ -49,36 +78,66 @@ export default function ChoirModal({ isOpen, onClose, onSave, editingChoir }) {
               type="text"
               required
               placeholder="Ej: Coro Niños"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
+              value={nombre}
+              onChange={(e) => setNombre(e.target.value)}
               className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 focus:bg-white"
             />
           </div>
 
           <div>
             <label className="block text-xs font-semibold text-slate-600 mb-1">
-              Sede / Ubicación
+              Sede / Ubicación *
             </label>
             <input
               type="text"
-              placeholder="Ej: Virreyes Oeste / Parroquia San Cayetano"
-              value={venue}
-              onChange={(e) => setVenue(e.target.value)}
+              placeholder="Ej: Parroquia San Cayetano"
+              value={sedeNombre}
+              onChange={(e) => setSedeNombre(e.target.value)}
               className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 focus:bg-white"
             />
           </div>
 
           <div>
             <label className="block text-xs font-semibold text-slate-600 mb-1">
-              Día y Horario de Ensayo
+              Localidad
             </label>
             <input
               type="text"
-              placeholder="Ej: Sábados 10:30 hs"
-              value={schedule}
-              onChange={(e) => setSchedule(e.target.value)}
+              placeholder="Ej: Virreyes Oeste"
+              value={sedeLocalidad}
+              onChange={(e) => setSedeLocalidad(e.target.value)}
               className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 focus:bg-white"
             />
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1">
+                Día de Ensayo
+              </label>
+              <select
+                value={diaSemana}
+                onChange={(e) => setDiaSemana(e.target.value)}
+                className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 focus:bg-white"
+              >
+                {DIAS.map(([valor, etiqueta]) => (
+                  <option key={valor} value={valor}>
+                    {etiqueta}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1">
+                Horario
+              </label>
+              <input
+                type="time"
+                value={horario}
+                onChange={(e) => setHorario(e.target.value)}
+                className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 focus:bg-white"
+              />
+            </div>
           </div>
 
           <div className="flex gap-2.5 pt-3">

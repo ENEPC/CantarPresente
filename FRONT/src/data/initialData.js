@@ -1,25 +1,144 @@
+// Datos de demostración: solo se usan si el dispositivo abre la app por
+// primera vez SIN conexión (con conexión, el bootstrap del servidor manda).
+// Los UUID fijos evitan colisiones entre seed y datos sincronizados.
+
+const ISO = '2026-01-01T00:00:00.000Z';
+
+const CHOIR_IDS = [
+  '00000000-0000-4000-8000-000000000001',
+  '00000000-0000-4000-8000-000000000002',
+  '00000000-0000-4000-8000-000000000003',
+  '00000000-0000-4000-8000-000000000004',
+  '00000000-0000-4000-8000-000000000005',
+];
+
 export const INITIAL_CHOIRS = [
-  { id: 1, name: "Coro Niños - Sede San Cayetano", venue: "Virreyes Oeste" },
-  { id: 2, name: "Coro Juvenil - Sede San Cayetano", venue: "Virreyes Oeste" },
-  { id: 3, name: "Coro Infantil - Sede Capilla Santa Ana", venue: "Virreyes" },
-  { id: 4, name: "Coro Voces Jóvenes - Sede Itatí", venue: "Virreyes" },
-  { id: 5, name: "Coro Inicial - Sede Esperanza", venue: "Virreyes Sur" }
+  {
+    id: CHOIR_IDS[0],
+    nombre: 'Coro Niños - Sede San Cayetano',
+    activo: true,
+    diaSemana: 'sabado',
+    horario: '10:30',
+    sede: { nombre: 'San Cayetano', localidad: 'Virreyes Oeste' },
+    createdAt: ISO,
+    updatedAt: ISO,
+    deletedAt: null,
+  },
+  {
+    id: CHOIR_IDS[1],
+    nombre: 'Coro Juvenil - Sede San Cayetano',
+    activo: true,
+    diaSemana: 'sabado',
+    horario: '12:00',
+    sede: { nombre: 'San Cayetano', localidad: 'Virreyes Oeste' },
+    createdAt: ISO,
+    updatedAt: ISO,
+    deletedAt: null,
+  },
+  {
+    id: CHOIR_IDS[2],
+    nombre: 'Coro Infantil - Sede Capilla Santa Ana',
+    activo: true,
+    diaSemana: 'viernes',
+    horario: '17:00',
+    sede: { nombre: 'Capilla Santa Ana', localidad: 'Virreyes' },
+    createdAt: ISO,
+    updatedAt: ISO,
+    deletedAt: null,
+  },
+  {
+    id: CHOIR_IDS[3],
+    nombre: 'Coro Voces Jóvenes - Sede Itatí',
+    activo: true,
+    diaSemana: 'martes',
+    horario: '18:30',
+    sede: { nombre: 'Itatí', localidad: 'Virreyes' },
+    createdAt: ISO,
+    updatedAt: ISO,
+    deletedAt: null,
+  },
+  {
+    id: CHOIR_IDS[4],
+    nombre: 'Coro Inicial - Sede Esperanza',
+    activo: true,
+    diaSemana: 'jueves',
+    horario: '16:00',
+    sede: { nombre: 'Esperanza', localidad: 'Virreyes Sur' },
+    createdAt: ISO,
+    updatedAt: ISO,
+    deletedAt: null,
+  },
 ];
 
 export const INITIAL_STUDENTS = [
-  { id: 101, name: "Mateo", lastname: "Gómez", choirId: 1, tutor: "Rosa Gómez", active: true },
-  { id: 102, name: "Lucía", lastname: "Fernández", choirId: 1, tutor: "Carmen Fernández", active: true },
-  { id: 103, name: "Thiago", lastname: "Benítez", choirId: 1, tutor: "Valeria Benítez", active: true },
-  { id: 104, name: "Bautista", lastname: "Romero", choirId: 2, tutor: "Mirta Romero", active: true },
-  { id: 105, name: "Martina", lastname: "Díaz", choirId: 3, tutor: "Estela Díaz", active: true }
+  {
+    id: '00000000-0000-4000-9000-000000000101',
+    nombre: 'Mateo',
+    apellido: 'Gómez',
+    fechaNacimiento: null,
+    responsableNombre: 'Rosa Gómez',
+    responsableTelefono: null,
+    observaciones: null,
+    activo: true,
+    coroIds: [CHOIR_IDS[0]],
+    createdAt: ISO,
+    updatedAt: ISO,
+    deletedAt: null,
+  },
+  {
+    id: '00000000-0000-4000-9000-000000000102',
+    nombre: 'Lucía',
+    apellido: 'Fernández',
+    fechaNacimiento: null,
+    responsableNombre: 'Carmen Fernández',
+    responsableTelefono: null,
+    observaciones: null,
+    activo: true,
+    coroIds: [CHOIR_IDS[0]],
+    createdAt: ISO,
+    updatedAt: ISO,
+    deletedAt: null,
+  },
+  {
+    id: '00000000-0000-4000-9000-000000000103',
+    nombre: 'Thiago',
+    apellido: 'Benítez',
+    fechaNacimiento: null,
+    responsableNombre: 'Valeria Benítez',
+    responsableTelefono: null,
+    observaciones: null,
+    activo: true,
+    coroIds: [CHOIR_IDS[0]],
+    createdAt: ISO,
+    updatedAt: ISO,
+    deletedAt: null,
+  },
+  {
+    id: '00000000-0000-4000-9000-000000000104',
+    nombre: 'Bautista',
+    apellido: 'Romero',
+    fechaNacimiento: null,
+    responsableNombre: 'Mirta Romero',
+    responsableTelefono: null,
+    observaciones: null,
+    activo: true,
+    coroIds: [CHOIR_IDS[1]],
+    createdAt: ISO,
+    updatedAt: ISO,
+    deletedAt: null,
+  },
+  {
+    id: '00000000-0000-4000-9000-000000000105',
+    nombre: 'Martina',
+    apellido: 'Díaz',
+    fechaNacimiento: null,
+    responsableNombre: 'Estela Díaz',
+    responsableTelefono: null,
+    observaciones: null,
+    activo: true,
+    coroIds: [CHOIR_IDS[2]],
+    createdAt: ISO,
+    updatedAt: ISO,
+    deletedAt: null,
+  },
 ];
-
-export function normalizeText(text) {
-  if (!text) return "";
-  return text
-    .toString()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .trim();
-}

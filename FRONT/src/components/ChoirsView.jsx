@@ -1,3 +1,13 @@
+const DIAS_ETIQUETA = {
+  lunes: 'Lunes',
+  martes: 'Martes',
+  miercoles: 'Miércoles',
+  jueves: 'Jueves',
+  viernes: 'Viernes',
+  sabado: 'Sábado',
+  domingo: 'Domingo',
+};
+
 export default function ChoirsView({
   choirs = [],
   students = [],
@@ -29,12 +39,18 @@ export default function ChoirsView({
         ) : (
           choirs.map((choir) => {
             const studentCount = students.filter((s) => {
-              if (!s.active) return false;
-              const cIds = Array.isArray(s.choirIds) ? s.choirIds : [s.choirId];
-              return cIds.map(Number).includes(Number(choir.id));
+              if (!s.activo) return false;
+              return (Array.isArray(s.coroIds) ? s.coroIds : []).includes(choir.id);
             }).length;
 
-            const displayLocation = choir.venue || choir.location;
+            const sedeNombre = choir.sede?.nombre;
+            const sedeLocalidad = choir.sede?.localidad;
+            const horarioTexto = [
+              choir.diaSemana ? DIAS_ETIQUETA[choir.diaSemana] || choir.diaSemana : null,
+              choir.horario ? `${choir.horario} hs` : null,
+            ]
+              .filter(Boolean)
+              .join(' · ');
 
             return (
               <div
@@ -42,15 +58,16 @@ export default function ChoirsView({
                 className="p-4 bg-white border border-slate-200 rounded-xl shadow-xs flex justify-between items-center"
               >
                 <div className="space-y-1">
-                  <h3 className="text-sm font-bold text-slate-800">{choir.name}</h3>
-                  {displayLocation && (
+                  <h3 className="text-sm font-bold text-slate-800">{choir.nombre}</h3>
+                  {sedeNombre && (
                     <p className="text-xs text-slate-500 flex items-center gap-1">
-                      📍 {displayLocation}
+                      📍 {sedeNombre}
+                      {sedeLocalidad ? ` (${sedeLocalidad})` : ''}
                     </p>
                   )}
-                  {choir.schedule && (
+                  {horarioTexto && (
                     <p className="text-xs text-slate-400 flex items-center gap-1">
-                      🕒 {choir.schedule}
+                      🕒 {horarioTexto}
                     </p>
                   )}
                   <div className="pt-1">

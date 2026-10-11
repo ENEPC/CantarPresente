@@ -42,6 +42,11 @@ export default defineConfig({
       }
     })
   ],
+  server: {
+    proxy: {
+      '/api': 'http://localhost:3001',
+    },
+  },
   preview: {
     allowedHosts: true // Permite el tráfico desde túneles como Localtunnel o Cloudflare
   }

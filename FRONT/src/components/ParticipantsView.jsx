@@ -11,18 +11,13 @@ export default function ParticipantsView({
   const [filterChoirId, setFilterChoirId] = useState('all');
 
   const filteredStudents = students.filter((student) => {
-    const studentChoirIds = Array.isArray(student.choirIds)
-      ? student.choirIds
-      : student.choirId
-      ? [student.choirId]
-      : [];
+    const studentChoirIds = Array.isArray(student.coroIds) ? student.coroIds : [];
 
     const belongsToChoir =
-      filterChoirId === 'all' ||
-      studentChoirIds.map(Number).includes(Number(filterChoirId));
+      filterChoirId === 'all' || studentChoirIds.includes(filterChoirId);
 
     const matchesSearch =
-      `${student.name} ${student.lastname} ${student.tutor || ''}`
+      `${student.nombre} ${student.apellido} ${student.responsableNombre || ''}`
         .toLowerCase()
         .includes(searchTerm.toLowerCase());
 
@@ -48,7 +43,7 @@ export default function ParticipantsView({
       <div className="space-y-2 bg-white p-3 rounded-xl border border-slate-200 shadow-xs">
         <input
           type="text"
-          placeholder="Buscar por nombre, apellido o tutor..."
+          placeholder="Buscar por nombre, apellido o responsable..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           className="w-full text-xs px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 focus:bg-white"
@@ -62,7 +57,7 @@ export default function ParticipantsView({
           <option value="all">Todos los Coros / Sedes</option>
           {choirs.map((c) => (
             <option key={c.id} value={c.id}>
-              {c.name}
+              {c.nombre}
             </option>
           ))}
         </select>
@@ -75,30 +70,24 @@ export default function ParticipantsView({
           </p>
         ) : (
           filteredStudents.map((s) => {
-            const studentChoirIds = Array.isArray(s.choirIds)
-              ? s.choirIds
-              : s.choirId
-              ? [s.choirId]
-              : [];
-
             const assignedChoirNames = choirs
-              .filter((c) => studentChoirIds.map(Number).includes(Number(c.id)))
-              .map((c) => c.name);
+              .filter((c) => (Array.isArray(s.coroIds) ? s.coroIds : []).includes(c.id))
+              .map((c) => c.nombre);
 
             return (
               <div
                 key={s.id}
                 className={`p-3 bg-white border rounded-xl shadow-xs transition-opacity ${
-                  s.active ? 'border-slate-200' : 'border-slate-100 opacity-60 bg-slate-50/50'
+                  s.activo ? 'border-slate-200' : 'border-slate-100 opacity-60 bg-slate-50/50'
                 }`}
               >
                 <div className="flex justify-between items-start">
                   <div>
                     <h3 className="text-sm font-bold text-slate-800">
-                      {s.lastname}, {s.name}
+                      {s.apellido}, {s.nombre}
                     </h3>
                     <p className="text-xs text-slate-400">
-                      Tutor: {s.tutor || 'No especificado'}
+                      Responsable: {s.responsableNombre || 'No especificado'}
                     </p>
                   </div>
 
@@ -115,12 +104,12 @@ export default function ParticipantsView({
                       type="button"
                       onClick={() => onToggleStatus(s.id)}
                       className={`px-2 py-1 text-[11px] font-semibold rounded-lg transition-colors cursor-pointer ${
-                        s.active
+                        s.activo
                           ? 'bg-emerald-50 text-emerald-700 hover:bg-rose-50 hover:text-rose-700'
                           : 'bg-slate-100 text-slate-500 hover:bg-emerald-50 hover:text-emerald-700'
                       }`}
                     >
-                      {s.active ? 'Activo' : 'Inactivo'}
+                      {s.activo ? 'Activo' : 'Inactivo'}
                     </button>
                   </div>
                 </div>

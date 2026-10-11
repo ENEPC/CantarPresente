@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { newUuid } from '../lib/ids.js';
 
 export default function AttendanceView({
   choirs = [],
@@ -6,65 +7,96 @@ export default function AttendanceView({
   attendances = [],
   onSaveAttendance,
 }) {
-  const [selectedChoirId, setSelectedChoirId] = useState(() => choirs[0]?.id || 1);
+  const [selectedChoirId, setSelectedChoirId] = useState(() => choirs[0]?.id || '');
   const [selectedDate, setSelectedDate] = useState(
     () => new Date().toISOString().split('T')[0]
   );
   const [currentAttendance, setCurrentAttendance] = useState({});
 
   useEffect(() => {
-    if (choirs.length > 0 && !choirs.some((c) => c.id === Number(selectedChoirId))) {
+    if (choirs.length > 0 && !choirs.some((c) => c.id === selectedChoirId)) {
       setSelectedChoirId(choirs[0].id);
     }
   }, [choirs, selectedChoirId]);
 
   useEffect(() => {
     const existing = (attendances || []).find(
-      (a) => a.choirId === Number(selectedChoirId) && a.date === selectedDate
+      (a) => a.coroId === selectedChoirId && a.fecha === selectedDate
     );
-    setCurrentAttendance(existing ? { ...existing.records } : {});
+    setCurrentAttendance(existing ? { ...existing.asistencias } : {});
   }, [selectedChoirId, selectedDate, attendances]);
 
-  // Filtra participantes asignados al coro seleccionado (soporta múltiples coros)
   const activeStudents = (students || []).filter((s) => {
-    if (!s.active) return false;
-    const cIds = Array.isArray(s.choirIds) ? s.choirIds : [s.choirId];
-    return cIds.map(Number).includes(Number(selectedChoirId));
+    if (!s.activo) return false;
+    return Array.isArray(s.coroIds) && s.coroIds.includes(selectedChoirId);
   });
 
   const togglePresence = (studentId) => {
     setCurrentAttendance((prev) => ({
       ...prev,
-      [studentId]: !prev[studentId],
+      [studentId]: prev[studentId] === 'presente' ? 'ausente' : 'presente',
     }));
   };
 
-  const presentCount = activeStudents.filter((s) => currentAttendance[s.id] === true).length;
+  const presentCount = activeStudents.filter(
+    (s) => currentAttendance[s.id] === 'presente'
+  ).length;
   const absentCount = activeStudents.length - presentCount;
+
+  const savedClass = (attendances || []).find(
+    (a) => a.coroId === selectedChoirId && a.fecha === selectedDate
+  );
 
   const handleSave = () => {
     if (!selectedDate) return alert('Seleccioná una fecha válida.');
-    if (typeof onSaveAttendance === 'function') {
-      onSaveAttendance(Number(selectedChoirId), selectedDate, currentAttendance);
-      alert('¡Asistencia guardada exitosamente en el dispositivo!');
+    if (!selectedChoirId) return alert('Seleccioná un coro.');
+
+    const ahora = new Date().toISOString();
+    const asistencias = {};
+    for (const s of activeStudents) {
+      asistencias[s.id] = currentAttendance[s.id] === 'presente' ? 'presente' : 'ausente';
     }
+
+    onSaveAttendance({
+      id: savedClass?.id ?? newUuid(),
+      coroId: selectedChoirId,
+      fecha: selectedDate,
+      asistencias,
+      synced: false,
+      createdAt: savedClass?.createdAt ?? ahora,
+      updatedAt: ahora,
+    });
+    alert('¡Asistencia guardada exitosamente en el dispositivo!');
   };
 
   return (
     <section className="space-y-4">
       <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 space-y-3">
-        <h2 className="text-base font-semibold text-slate-700">Toma de Asistencia</h2>
+        <div className="flex items-center justify-between">
+          <h2 className="text-base font-semibold text-slate-700">Toma de Asistencia</h2>
+          {savedClass && (
+            <span
+              className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                savedClass.synced
+                  ? 'bg-emerald-50 text-emerald-600 border border-emerald-200'
+                  : 'bg-amber-50 text-amber-600 border border-amber-200'
+              }`}
+            >
+              {savedClass.synced ? 'Sincronizada' : 'Sin sincronizar'}
+            </span>
+          )}
+        </div>
         <div className="grid grid-cols-2 gap-2">
           <div>
             <label className="text-xs font-medium text-slate-500">Coro / Sede</label>
             <select
               value={selectedChoirId}
-              onChange={(e) => setSelectedChoirId(Number(e.target.value))}
+              onChange={(e) => setSelectedChoirId(e.target.value)}
               className="w-full text-sm mt-1 p-2 border border-slate-300 rounded-lg bg-white"
             >
               {(choirs || []).map((c) => (
                 <option key={c.id} value={c.id}>
-                  {c.name}
+                  {c.nombre}
                 </option>
               ))}
             </select>
@@ -100,7 +132,7 @@ export default function AttendanceView({
           </p>
         ) : (
           activeStudents.map((s) => {
-            const isPresent = Boolean(currentAttendance[s.id]);
+            const isPresent = currentAttendance[s.id] === 'presente';
             return (
               <div
                 key={s.id}
@@ -108,10 +140,10 @@ export default function AttendanceView({
               >
                 <div>
                   <p className="text-sm font-semibold text-slate-800">
-                    {s.lastname}, {s.name}
+                    {s.apellido}, {s.nombre}
                   </p>
                   <p className="text-xs text-slate-400">
-                    Tutor: {s.tutor || 'No especificado'}
+                    Responsable: {s.responsableNombre || 'No especificado'}
                   </p>
                 </div>
                 <button
