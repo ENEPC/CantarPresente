@@ -1,0 +1,2850 @@
+╭─── Claude Code v2.1.153 ─────────────────────────────────────────────────────╮
+│                                         │ Tips for getting started           │
+│              Welcome back!              │ Run /init to create a CLAUDE.md f… │
+│                                         │ ────────────────────────────────── │
+│                 ▐▛███▜▌                 │ What's new                         │
+│                ▝▜█████▛▘                │ Fixed an issue when using Opus 4.… │
+│                  ▘▘ ▝▝                  │ Opus 4.8 is here! Now defaults to… │
+│                                         │ Introducing dynamic workflows: as… │
+│   deepseek-v4-pro · API Usage Billing   │ /release-notes for more            │
+│    ~/…/Prototipo-CantarPresente/BACK    │                                    │
+╰──────────────────────────────────────────────────────────────────────────────╯
+
+
+❯ segun la documentacion en @docs/ , como plantearias el modelado de            
+  tablas/datos de este proyecto? aun no modifiques el codigo hasta nuevo aviso  
+  ⎿  Listed directory docs/
+
+  Thought for 11s (ctrl+o to expand)
+
+● Voy a revisar la documentación del proyecto y la estructura actual del repo
+  para proponerte un modelado de datos. Empiezo explorando el contexto.
+
+  Thought for 5s, searched for 1 pattern, listed 1 directory, ran 1 shell command (ctrl+o to expand)
+
+● No hay librerías de Office en Python. Las instalo localmente para poder leer
+  los documentos, y de paso veo qué tiene el frontend actual.
+
+  Thought for 3s, listed 1 directory, ran 1 shell command (ctrl+o to expand)
+
+● El frontend es React + Vite + Tailwind con vistas de Coros, Participantes,
+  Asistencia e Historial. Ahora extraigo el contenido de los documentos clave.
+
+  Thought for 4s, ran 2 shell commands (ctrl+o to expand)
+
+● Ya tengo los requerimientos: es un sistema de gestión de coros y asistencia
+  para la ONG "Sembrar Cantando", con modo offline (PWA). Sigo con el charter,
+  el kickoff, el relevamiento y los datos actuales del frontend.
+
+  Thought for 5s, ran 2 shell commands (ctrl+o to expand)
+
+● La documentación es muy rica. Ahora reviso el modelo de datos actual del
+  prototipo (frontend) y el KickOff/EDT para completar el panorama.
+
+  Thought for 7s, read 4 files (ctrl+o to expand)
+
+● El PDF son diapositivas como imágenes; intento extraer el texto con una
+  librería.
+
+  Thought for 9s, ran 1 shell command (ctrl+o to expand)
+
+● Ya tengo el panorama completo. Hago dos verificaciones rápidas: la estructura
+  del registro de asistencia en el prototipo actual y si hay más detalle sobre
+  alertas/indicadores en los demás documentos.
+
+  Thought for 52s, searched for 1 pattern, ran 1 shell command, searched memories (ctrl+o to expand)
+
+● Tengo todo el panorama de la documentación. Antes de responder, guardo el
+  contexto del proyecto en memoria para futuras sesiones.
+
+  Thought for 2s, wrote 3 memories (ctrl+o to expand)
+
+● Leí toda la documentación clave (Charter, Enfoque de Implementación,
+  Requerimientos RF-01..29 / RNF-01..22, Relevamiento Inicial, KickOff, Riesgos,
+   Plan de Testing) y el prototipo actual del frontend. Acá va mi planteo como
+  DBA.
+
+  Lo que la documentación impone al modelo
+
+  ┌─────────────────┬───────────────────────────────────────────────────────┐
+  │     Fuente      │              Restricción para el diseño               │
+  ├─────────────────┼───────────────────────────────────────────────────────┤
+  │                 │ PWA offline-first (IndexedDB + Background Sync) →     │
+  │ Enfoque v2.0    │ PostgreSQL central vía APIs serverless en Vercel.     │
+  │                 │ Solo planes gratuitos                                 │
+  ├─────────────────┼───────────────────────────────────────────────────────┤
+  │ Relevamiento    │ Tablas sugeridas: Directores, Estudiantes, Madres,    │
+  │ (slide 11)      │ Jefes de cuerda, Grupos de coro, Eventos, Clases,     │
+  │                 │ Asistencia                                            │
+  ├─────────────────┼───────────────────────────────────────────────────────┤
+  │ RF-07           │ Baja lógica de participante conservando historial     │
+  ├─────────────────┼───────────────────────────────────────────────────────┤
+  │ RF-08           │ Un participante en varios coros sin duplicar su       │
+  │                 │ registro personal → N:M                               │
+  ├─────────────────┼───────────────────────────────────────────────────────┤
+  │ RF-15/17/18     │ Asistencia por coro + fecha, estados                  │
+  │                 │ presente/ausente/justificado                          │
+  ├─────────────────┼───────────────────────────────────────────────────────┤
+  │ RF-22..26 /     │ Registro sin conexión + sincronización sin pérdidas   │
+  │ RNF-06/18       │ ni duplicados desde múltiples dispositivos            │
+  ├─────────────────┼───────────────────────────────────────────────────────┤
+  │ RF-01..03       │ Autenticación, usuarios y permisos por rol            │
+  ├─────────────────┼───────────────────────────────────────────────────────┤
+  │ RF-27..29 +     │ Indicadores por coro/sede, alertas de ausentismo      │
+  │ Enfoque         │ (umbral), reportes para donantes                      │
+  ├─────────────────┼───────────────────────────────────────────────────────┤
+  │ KickOff         │ NO incluye módulo de eventos → lo descarto del modelo │
+  └─────────────────┴───────────────────────────────────────────────────────┘
+
+  Decisiones de diseño clave
+
+  1. UUID como PK en todas las tablas, generado en el dispositivo. Es la única
+  forma segura de sincronizar registros creados offline desde varios celulares
+  sin colisiones de IDs (riesgo RSK.05 del registro de riesgos).
+  2. updated_at + deleted_at (tombstones) en todas las tablas. El sync es
+  push/pull con resolución last-write-wins por updated_at; las bajas lógicas
+  viajan como tombstones.
+  3. Idempotencia por restricciones UNIQUE + upsert (ON CONFLICT): clases 
+  UNIQUE(coro_id, fecha) y asistencias PK(clase_id, participante_id) hacen que
+  re-sincronizar nunca duplique (RF-25, RNF-06).
+  4. Sedes separadas de coros (el prototipo actual mezcla venue dentro del coro;
+   RF-10/12 exigen entidad propia y RF-09 pide conteos por sede).
+  5. Membresía N:M participante↔coro con fechas de alta/baja (RF-08, RF-13). La
+  sede del participante se deriva del coro — no se duplica.
+  6. Entidad clases (ensayos) explícita entre coro y asistencia: soporta
+  "justificado", quién registró, observaciones, y es la unidad que el sync puede
+   deduplicar. El prototipo actual lo aproxima con {choirId, date}.
+  7. RBAC ligero: tabla de roles + usuarios_coros para limitar qué coros ve cada
+   director/voluntario (RF-03, RF-13). A esta escala (+100 participantes, pocos
+  usuarios) permisos granulares por tabla son exceso.
+
+  Modelo propuesto (PostgreSQL)
+
+  sedes 1──N coros 1──N clases 1──N asistencias N──1 participantes
+                │                          └──N participantes_coros N┘
+  usuarios N──1 roles
+  usuarios N──M coros  (usuarios_coros)
+
+  -- Maestras
+  sedes        (id UUID PK, nombre, direccion, localidad, activa BOOL,
+                created_at, updated_at, deleted_at)
+
+  coros        (id UUID PK, nombre, sede_id FK→sedes NOT NULL, activa BOOL,
+                created_at, updated_at, deleted_at)
+
+  usuarios     (id UUID PK, nombre, apellido, email UNIQUE, password_hash,
+                rol_id FK→roles, activo BOOL, ultima_sincronizacion TIMESTAMPTZ,
+                created_at, updated_at, deleted_at)
+
+  roles        (id PK, nombre UNIQUE -- 
+  'admin','coordinacion','director_coro','voluntario'
+               , descripcion)
+
+  usuarios_coros (usuario_id FK, coro_id FK, PK(usuario_id, coro_id))
+
+  participantes (id UUID PK, nombre, apellido, fecha_nacimiento DATE NULL,
+                responsable_nombre, responsable_telefono, observaciones,
+                activo BOOL, created_at, updated_at, deleted_at)   -- RF-04..07
+
+  participantes_coros (id UUID PK, participante_id FK, coro_id FK,
+                fecha_alta DATE, fecha_baja DATE NULL,
+                rol TEXT NULL,          -- 'integrante' | 'jefe_cuerda'
+                UNIQUE(participante_id, coro_id),                   -- RF-08
+                created_at, updated_at)
+
+  -- Transaccionales
+  clases       (id UUID PK, coro_id FK, fecha DATE, hora TIME NULL,
+                usuario_id FK→usuarios, observaciones,
+                UNIQUE(coro_id, fecha),                              -- 
+  idempotencia sync
+                created_at, updated_at, deleted_at)
+
+  asistencias  (clase_id FK, participante_id FK,
+                estado CHECK IN ('presente','ausente','justificado'),
+                registrado_por FK→usuarios NULL,
+                PK(clase_id, participante_id),                       -- upsert 
+  idempotente
+                created_at, updated_at)
+
+  -- Soporte
+  configuracion (clave PK, valor JSONB)   -- ej. umbral alerta ausentismo
+  sincronizaciones (id UUID PK, dispositivo_id, usuario_id, fecha,
+                registros_ok INT, registros_err INT, estado, detalle JSONB)  -- 
+  log/auditoría opcional
+
+  Índices que piden los RF:
+  - coros(sede_id) → RF-09/28
+  - clases(coro_id, fecha) (cubierto por el UNIQUE)
+  - asistencias(participante_id, clase_id) → historial RF-19/21
+  - índice parcial participantes_coros(coro_id) WHERE fecha_baja IS NULL → lista
+   del padrón activo RF-09/16
+
+  Sobre "Madres" y "Directores" del relevamiento: quedan absorbidos en usuarios
+  (toman asistencia → director_coro/voluntario scoped por usuarios_coros).
+  "Jefes de cuerda" son participantes con rol en la membresía. Tutor/responsable
+   lo dejo como campos del participante (igual que el prototipo); normalizarlo a
+   tabla propia solo se justifica si un responsable tiene varios chicos y querés
+   deduplicar contacto.
+
+  Soporte offline / sync (RF-22..26)
+
+  - IndexedDB local = espejo reducido de la BD central:
+  sedes/coros/participantes (los coros del usuario), clases/asistencias
+  pendientes + una outbox con las operaciones.
+  - Flujo: push de la outbox (upserts por PK/UNIQUE) → pull de cambios remotos
+  desde ultima_sincronizacion → resolver conflictos por updated_at
+  (last-write-wins; para asistencias, además, el upsert por PK compuesta).
+  - Sugerencia de UX: al crear la clase, el frontend materializa filas ausente
+  para todos los miembros activos; el director solo marca
+  presentes/justificados. Así RF-17 (identificar presente y ausente) se cumple
+  sin asumir "ausente = sin fila".
+
+  Indicadores (RF-27..29) — vistas, no tablas
+
+  -- % asistencia mensual por coro/sede (pivot estados)
+  -- historial por participante (RF-19)
+  -- rachas de ausencias consecutivas → cruzar contra configuracion.umbral 
+  (alertas)
+  -- totales de participantes activos por coro y sede (RF-09)
+
+  Con +100 participantes y ~4 clases/semana, el volumen no justifica vistas
+  materializadas ni tablas de agregados; consultas directas sobre los índices de
+   arriba alcanzan de sobra (RNF-14). Si el panel admin pide dashboards en vivo,
+   recién ahí evaluaría vistas materializadas.
+
+  Puntos abiertos para validar antes de crear el DDL
+
+  1. ¿Una clase por día por coro? RF-15 dice "un coro y una fecha", y así puse
+  el UNIQUE. Si un coro puede ensayar dos veces el mismo día, hay que meter hora
+   en la clave.
+  2. Campos del legajo: el Enfoque menciona "campos de legajos" sin detallar.
+  Dado que son menores, propongo mínimo: nombre, apellido, fecha_nacimiento,
+  responsable + teléfono. ¿La ONG pidió DNI/dirección?
+  3. ¿Las "Madres" registran asistencia además de los directores? El organigrama
+   del KickOff dice "asistencia y cuidado" → asumí que sí (usuarios_coros las
+  cubre), pero conviene confirmarlo con la ONG.
+  4. "Eventos" del relevamiento: el KickOff los excluye del alcance. Confirmar
+  que no hay que modelar presentaciones especiales (si las hubiera, una tabla
+  eventos reutilizaría el patrón de clases).
+  5. Frecuencia de alertas: ¿las rachas de ausentismo se evalúan on-demand en el
+   panel o necesitan envío proactivo? (afecta solo a la app, no al esquema).
+
+  Relación con el prototipo actual: el modelo de initialData.js mapea 1:1 a este
+   esquema (coros→coros, venue→sedes, students→participantes+membresía,
+  attendances→clases+asistencias). La migración será mecánica; los cambios
+  reales son: sedes separadas, membresía N:M (hoy choirId único), estados enum
+  (hoy booleano) y UUIDs.
+
+  Si te sirve, puedo armar el DDL completo (con constraints y comentarios) o un
+  diagrama ER en mermaid para el entregable de "Modelo de Datos" del charter —
+  avisame cuando quieras que toque algo.
+
+✻ Cooked for 2m 32s
+
+❯ deja documentado en algun lado las tablas que hiciste                         
+
+  Thought for 13s (ctrl+o to expand)
+
+● Creo el documento del modelo de datos en docs/, siguiendo la convención de
+  nombres de la carpeta.
+
+● Write(~/Proyectos/Facultad-2026B/DireccionDeProyectos/Prototipo-CantarPresente
+       /docs/Modelo de Datos_v0.1.md)
+  ⎿  Wrote 232 lines to ../docs/Modelo de Datos_v0.1.md
+      1 # Modelo de Datos — Cantar Presente
+      2 
+      3 | Campo | Valor |
+      4 |---|---|
+      5 | Proyecto | Cantar Presente: sistema de gestión de participantes
+      6 | Autor | Tadeo Jablonski (DBA / Analista de Datos) |
+      7 | Fecha | 09/10/2026 |
+      8 | Versión | 0.1 — Borrador para revisión del equipo |
+      9 | Estado | Pendiente de validación con la ONG y el equipo de desa
+        rrollo |
+     … +287 lines (ctrl+o to expand)
+
+  Thought for 2s (ctrl+o to expand)
+
+● Listo. Creé docs/Modelo de Datos_v0.1.md (sin tocar código) con:
+
+  - Contexto y restricciones derivadas de los documentos (RF/RNF)
+  - Las 7 decisiones de diseño (UUIDs offline, tombstones, idempotencia, N:M,
+  etc.)
+  - Diagrama ER en mermaid
+  - DDL de referencia de las 11 tablas (sedes, coros, roles, usuarios,
+  usuarios_coros, participantes, participantes_coros, clases, asistencias,
+  configuracion, sincronizaciones)
+  - Índices, estrategia de sincronización, indicadores, trazabilidad RF → tablas
+   y puntos abiertos para validar con la ONG
+
+  Quedó marcado como v0.1 "borrador para revisión del equipo" — si querés
+  después lo renombramos/versionamos para el entregable formal del charter.
+
+✻ Sautéed for 34s
+
+❯ vamos a hacer el backend con nodejs y expressjs. que estructura tendria el    
+  backend para gestionar la BD? vamos a usar los siguientes endpoints, solo     
+  esos: @../endpoints.txt no modifiques codigo solo muestrame la estructura     
+  ⎿  Read ../endpoints.txt (31 lines)
+
+  Thought for 32s (ctrl+o to expand)
+
+● Perfecto. Antes de mostrarte la estructura, tres observaciones importantes al
+  cruzar tus endpoints con el modelo de datos v0.1:
+
+  1. Los endpoints tratan "coro/sede" como un solo recurso ("Crea un coro/sede
+  nuevo"), pero RF-10/12 y el modelo los normalizan en tablas separadas. Muestro
+   la estructura asumiendo el modelo normalizado y al final te dejo las dos
+  opciones de mapeo.
+  2. No hay endpoint de autenticación (RF-01..03 exige login). Dejo el
+  middleware previsto; hay que decidir si se agrega un POST /api/auth/login
+  después o si no aplica para este alcance.
+  3. PUT /api/choirs/:id menciona "día/horario" — el modelo v0.1 no tiene esa
+  columna en coros. Hay que agregarla (ej. dia_semana, horario) o derivarla de
+  clases.
+
+  Estructura propuesta
+
+  BACK/
+  ├── package.json
+  ├── .env.example                    # DATABASE_URL, PORT
+  ├── vercel.json                     # rewrite /* → api/index.js (serverless)
+  ├── api/
+  │   └── index.js                    # entry para Vercel: serverless-http(app)
+  ├── src/
+  │   ├── server.js                   # entry local: node src/server.js
+  │   ├── app.js                      # app Express: express.json(), rutas,
+  errorHandler
+  │   ├── config/
+  │   │   └── db.js                   # Pool de pg (máx ~3 conexiones por
+  límites de Neon/Supabase gratis)
+  │   ├── middlewares/
+  │   │   ├── auth.js                 # RF-01..03 — pendiente de definición (no
+  hay endpoint de login)
+  │   │   └── errorHandler.js         # ApiError → 4xx/5xx con mensaje
+  │   ├── routes/
+  │   │   ├── bootstrap.routes.js     # GET  /api/bootstrap
+  │   │   ├── attendances.routes.js   # POST /api/attendances/sync · GET
+  /api/attendances
+  │   │   ├── students.routes.js      # POST /api/students · PUT
+  /api/students/:id
+  │   │   └── choirs.routes.js        # POST /api/choirs · PUT /api/choirs/:id
+  │   ├── services/                   # lógica de negocio y transacciones
+  │   │   ├── bootstrap.service.js
+  │   │   ├── sync.service.js         # ← el crítico: lote transaccional +
+  upserts idempotentes
+  │   │   ├── students.service.js
+  │   │   └── choirs.service.js
+  │   ├── repositories/               # SQL puro por entidad (pg)
+  │   │   ├── bootstrap.repo.js
+  │   │   ├── choirs.repo.js
+  │   │   ├── students.repo.js
+  │   │   └── attendance.repo.js
+  │   └── utils/
+  │       ├── errors.js               # ApiError con status
+  │       └── validate.js             # schemas zod por payload
+  ├── db/
+  │   ├── migrations/
+  │   │   ├── 001_esquema.sql         # DDL del Modelo de Datos v0.1
+  │   │   ├── 002_indices_vistas.sql  # índices + vistas de indicadores
+  (RF-27..29)
+  │   │   └── migrate.js              # runner simple en orden (o
+  node-pg-migrate)
+  │   └── seeds/
+  │       └── 001_roles_sedes_coros.sql
+  └── tests/
+      ├── attendances.sync.test.js    # idempotencia: re-enviar el mismo lote no
+   duplica
+      ├── students.test.js
+      └── choirs.test.js
+
+  Con 7 endpoints, routes → services → repositories es suficiente (sin capa de
+  controllers separada). Cumple RNF-19 (modular) y deja a cada integrante tocar
+  una capa sin pisarse.
+
+  Cómo se mapea cada endpoint a la BD
+
+  GET /api/bootstrap — 2 consultas filtradas por los coros del usuario
+  (usuarios_coros, RF-03):
+  1. SELECT c.*, s.nombre AS sede FROM coros c JOIN sedes s ...
+  2. SELECT p.*, pc.coro_id FROM participantes p JOIN participantes_coros pc ON 
+  ... WHERE pc.fecha_baja IS NULL
+
+  El dispositivo guarda esto en IndexedDB como su "espejo" inicial.
+
+  POST /api/attendances/sync — el servicio abre transacción y por cada sesión
+  del lote:
+  - upsert de clases con ON CONFLICT (coro_id, fecha) DO UPDATE ... WHERE 
+  EXCLUDED.updated_at > clases.updated_at (no pisar datos más nuevos,
+  last-write-wins)
+  - upsert de cada asistencias con ON CONFLICT (clase_id, participante_id) DO 
+  UPDATE (la PK compuesta hace idempotente el reenvío — RF-25/RNF-06)
+  - INSERT en sincronizaciones (log con ok/errores) y COMMIT
+
+  Ejemplo de payload que encaja con el modelo:
+
+  {
+    "dispositivoId": "uuid-celular",
+    "lotes": [
+      {
+        "clase": { "id": "uuid", "coroId": "uuid", "fecha": "2026-10-09",
+  "updatedAt": "..." },
+        "asistencias": [
+          { "participanteId": "uuid", "estado": "presente", "updatedAt": "..." }
+        ]
+      }
+    ]
+  }
+
+  GET /api/attendances — filtros coroId, participanteId, desde, hasta
+  (RF-20/21): join clases ↔ asistencias; los porcentajes/indicadores quedan en
+  las vistas de 002_indices_vistas.sql.
+
+  POST /api/students — transacción: INSERT participantes (UUID generado en el
+  dispositivo) + INSERT participantes_coros por cada coro asignado (RF-08).
+
+  PUT /api/students/:id — transacción: update de participantes + diff de
+  membresías (insert nuevas, fecha_baja = hoy para las removidas, upsert de las
+  vigentes). El toggle activo/inactivo es activo = false — baja lógica, nunca
+  DELETE (RF-07).
+
+  POST /api/choirs / PUT /api/choirs/:id — acá está la decisión de mapeo:
+
+  - Opción A (recomendada, modelo normalizado): el body trae { nombre, 
+  diaSemana, horario, sede: {...} }; el service hace upsert de la sede (match
+  por nombre/localidad) y referencia sede_id. Cumple RF-10/12 y RF-28 (reportes
+  por sede).
+  - Opción B (simplificar): fundir sedes dentro de coros como columnas
+  (sede_nombre, localidad). Menos tablas, pero RF-09/28 (conteos por sede)
+  quedan frágiles y se aleja de los requerimientos.
+
+  Notas para Vercel (free tier)
+
+  - vercel.json con rewrite a api/index.js + serverless-http permite correr la
+  misma app Express local y en serverless.
+  - Pool de pg con pocas conexiones y statement_timeout corto (cada lambda
+  mantiene su propio pool; Neon/Supabase gratis limitan conexiones).
+  - Las migraciones se corren aparte (script db/migrations/migrate.js), no en
+  cada invocación.
+
+  ¿Querés que deje esta estructura documentada en docs/ junto al modelo de
+  datos, o que la ajuste antes (ej. opción A vs B, endpoint de auth)? No toco
+  código hasta que me digas.
+
+✻ Crunched for 43s
+
+❯ no faltaria un apartado /model?                                               
+
+  Thought for 14s (ctrl+o to expand)
+
+● Sí, es un buen punto. En mi propuesta ese rol quedaba repartido entre
+  repositories/ (SQL) y utils/validate.js (schemas), pero un apartado models/
+  explícito deja más clara la separación y espeja el diccionario de datos del
+  doc v0.1. Depende de la decisión ORM vs pg puro:
+
+  Variante 1 — pg puro (la que recomiendo para este proyecto)
+
+  src/
+  ├── models/                      # forma y validación de cada entidad (uno por
+   tabla)
+  │   ├── sede.model.js            # zod schema + map row↔objeto
+  (snake_case→camelCase)
+  │   ├── coro.model.js
+  │   ├── participante.model.js
+  │   ├── membresia.model.js       # participantes_coros
+  │   ├── clase.model.js
+  │   ├── asistencia.model.js
+  │   └── usuario.model.js
+  ├── repositories/                # SQL puro (INSERT/UPDATE/upserts)
+  ├── services/                    # negocio: usa repo + model
+  └── ...
+
+  - models/ define el shape (zod + mapeo de columnas) y las validaciones de
+  entrada/salida; repositories/ sigue siendo el único lugar con SQL.
+  - El sync con ON CONFLICT ... WHERE updated_at queda en el repo sin fricción,
+  porque es SQL que ya tenés diseñado en el DDL.
+
+  Variante 2 — con ORM
+
+  src/
+  ├── models/                      # entidades del ORM
+  │   ├── sede.js
+  │   ├── coro.js
+  │   └── ...
+  ├── services/
+  └── ...                          # repositories desaparecen
+
+  - models/ = definiciones del ORM (Sequelize) o prisma/schema.prisma.
+  - Costo: hay que portar el DDL v0.1 al dialecto del ORM y las migraciones
+  pasan a generarse desde él. Además el upsert condicional del sync (ON CONFLICT
+   ... DO UPDATE ... WHERE EXCLUDED.updated_at > ...) no se expresa bien en
+  Prisma/Sequelize — sí en Drizzle (onConflictDoUpdate + setWhere), que además
+  es liviano para cold starts de Vercel.
+
+  Para este proyecto (7 endpoints, SQL de sync ya diseñado, free tier en Vercel)
+   me inclino por la Variante 1: control total del SQL, cero dependencias extra
+  y el modelo de datos v0.1 se traduce directo a los archivos de models/.
+
+  ¿Cuál preferís? Si me confirmás, actualizo la estructura en la
+  respuesta/documentación — sigo sin tocar código.
+
+✻ Brewed for 18s
+❯ para que sirve middlewares?                                                   
+
+  Thought for 3s (ctrl+o to expand)
+
+● Los middlewares son funciones que se ejecutan entre la llegada de un request y
+   el handler de la ruta. Cada uno puede: inspeccionar/modificar el request,
+  cortar la cadena respondiendo directo (ej. "no autorizado") o pasar al
+  siguiente con next().
+
+  En Express se encadenan así:
+
+  request → [middleware 1] → [middleware 2] → ... → handler de la ruta →
+  response
+
+  Para qué sirven en la práctica (con ejemplos de este backend):
+
+  1. Funcionalidad transversal sin repetir código: algo que necesitan todas las
+  rutas se escribe una sola vez.
+    - express.json() — parsea el body JSON de todos los endpoints (sync,
+  students, choirs).
+    - Logging: registrar método, ruta, duración y resultado de cada request →
+  alimenta sincronizaciones y el monitoreo que pide el Enfoque.
+  2. Autenticación/permisos (RF-01..03): en auth.js verificás credenciales/token
+   y cargás req.usuario con su rol_id. Ahí mismo podés restringir por rol (ej.
+  solo coordinacion/admin crean coros) y por coro (usuarios_coros: un
+  director_coro solo ve/toma asistencia de sus coros). Si un request no pasa, se
+   responde 401/403 y el handler nunca se ejecuta — la BD queda protegida en un
+  solo punto.
+  3. Manejo centralizado de errores: errorHandler.js captura cualquier excepción
+   que lancen services/repos (constraint violada, conexión caída, etc.) y la
+  traduce a una respuesta HTTP consistente (409, 422, 500...) en vez de que cada
+   ruta haga su propio try/catch.
+  4. Validación de payloads: con zod, validás el body de /api/attendances/sync
+  (que vengan UUIDs, estados válidos presente/ausente/justificado) antes de
+  tocar la BD — evita datos inválidos en asistencias.estado (que además tiene
+  CHECK en la DB, pero el middleware corta antes con un 422 claro).
+
+  La regla simple: si algo aplica a muchas rutas o hay que garantizarlo antes de
+   la lógica de negocio → middleware. Si es específico de un endpoint → queda en
+   su service/repo.
+
+  En la estructura propuesta, middlewares/ tendría auth.js y errorHandler.js;
+  express.json() y logging van directo en app.js porque son de Express o una
+  línea.
+
+✻ Churned for 8s
+
+❯ y la conexion con supabase como se gestiona?                                  
+
+  Thought for 20s (ctrl+o to expand)
+
+● Buena pregunta — como DBA es justo la parte que te toca definir. La gestión
+  tiene tres patas: cadena de conexión, pool configurado para serverless y
+  migraciones/backups.
+
+  1. Cadena de conexión (.env)
+
+  Supabase te da dos formas de conectarte, y conviene usar ambas según el
+  contexto:
+
+  # Local / migraciones: conexión directa
+  DATABASE_URL=postgresql://postgres.<ref>:<password>@db.<ref>.supabase.co:5432/
+  postgres
+
+  # Serverless (Vercel): pooler Supavisor en modo transacción (puerto 6543)
+  DATABASE_URL_POOLED=postgresql://postgres.<ref>:<password>@aws-0-<region>.pool
+  er.supabase.com:6543/postgres
+
+  - En Vercel se setea como variable de entorno del proyecto (no se commitea
+  nunca).
+  - Por qué el pooler para serverless: cada lambda de Vercel mantiene su propio
+  pool y el plan gratuito de Supabase limita las conexiones directas (unas
+  decenas). Con pg puro, 20 lambdas frías = 20+ conexiones directas. El pooler
+  en modo transacción multiplexa todas las lambdas sobre un puñado de
+  conexiones.
+  - Ojo: el pooler exige SSL y no soporta prepared statements con nombre — con
+  el driver pg por defecto no se usan, así que no hay problema. Las
+  transacciones de sync.service.js (BEGIN/COMMIT) sí funcionan en modo
+  transacción: el pooler fija la conexión durante la transacción.
+
+  2. Pool en src/config/db.js
+
+  import { Pool } from "pg";
+
+  const isServerless = process.env.VERCEL;
+
+  export const pool = new Pool({
+    connectionString: isServerless
+      ? process.env.DATABASE_URL_POOLED
+      : process.env.DATABASE_URL,
+    ssl: { rejectUnauthorized: false },
+    max: isServerless ? 2 : 10,            // pool chico en lambda
+    connectionTimeoutMillis: 5000,
+    idleTimeoutMillis: 30000,
+    statement_timeout: 8000,               // corta consultas lentas
+    allowExitOnIdle: true,                 // no bloquea el shutdown de la 
+  lambda
+  });
+
+  - El pool se crea una vez a nivel módulo y se reutiliza entre invocaciones de
+  la lambda (warm start).
+  - statement_timeout corto evita que una consulta lenta congele la función y
+  consuma el tiempo de Vercel.
+  - En dev local: conexión directa con pool normal, sin restricciones.
+
+  3. Migraciones, seeds y RLS
+
+  - Migraciones: db/migrations/migrate.js se corre manualmente (o en CI) contra
+  DATABASE_URL directa, en orden numérico. Alternativa rápida: pegar el DDL de
+  Modelo de Datos_v0.1.md en el SQL Editor de Supabase. Los seeds (roles, sedes,
+   coros) igual.
+  - RLS (detalle importante): Supabase activa Row Level Security por defecto
+  para su Auth, pero vos te conectás como postgres con la connection string —
+  ese rol bypasea RLS. Es decir: la seguridad NO queda en la BD sino en la app
+  (usuarios/roles/usuarios_coros + middleware auth.js), como diseñamos en el
+  modelo. No uses las claves anon/service_role de Supabase para estas APIs REST
+  propias.
+  - Backups (RNF-17): el plan gratuito de Supabase incluye backups diarios
+  automáticos. Eso cubre el requerimiento; lo que falta documentar (y te toca
+  como responsable de datos, según el Enfoque) es el procedimiento de 
+  restauración y su verificación periódica.
+
+  Resumen: URL directa para migraciones/dev, URL pooler transacción para
+  producción serverless, pool chico con timeouts, y seguridad en la app (no
+  RLS). ¿Querés que arme el detalle de db.js y el script de migraciones para
+  documentarlo junto con la estructura del backend?
+
+✻ Cooked for 27s
+
+❯ como hosteamos todo en vercel? el front y el back?                            
+
+  Thought for 14s (ctrl+o to expand)
+
+● La forma más limpia en el plan gratuito (Hobby) es dos proyectos de Vercel:
+  uno para el FRONT y otro para el BACK. Cada uno con su dominio propio y
+  deploys independientes. La alternativa monorepo (un solo proyecto con
+  rewrites) es posible pero complica el build: Vercel instala dependencias solo
+  desde la raíz, y tenés FRONT y BACK con package.json separados.
+
+  Proyecto 1 — FRONT (PWA)
+
+  Vercel autodetecta Vite:
+
+  // FRONT/vercel.json (opcional, solo para el proxy del punto siguiente)
+  {
+    "rewrites": [
+      { "source": "/api/(.*)", "destination":
+  "https://cantar-presente-api.vercel.app/api/$1" }
+    ]
+  }
+
+  - Build: npm run build → output dist (autodetectado).
+  - CORS sin dolor: con ese rewrite, el front llama a /api/... (same-origin) y
+  Vercel lo proxea al BACK. Así no necesitás middleware CORS ni exponer la URL
+  de la API en el cliente.
+  - PWA: Vercel sirve todo por HTTPS gratis (requisito del service worker).
+  vite-plugin-pwa ya está en el package.json; el SW cachea el shell de la app, y
+   lo offline de datos sigue viviendo en IndexedDB.
+  - Variable de entorno: si preferís llamar directo al BACK, VITE_API_URL con el
+   dominio del proyecto 2.
+
+  Proyecto 2 — BACK (Express serverless)
+
+  - Root Directory = BACK/. Vercel detecta api/index.js como serverless function
+   (con serverless-http adentro, tal cual la estructura que vimos).
+  - Variables de entorno del proyecto:
+    - DATABASE_URL_POOLED → pooler de Supabase en modo transacción (puerto 6543)
+    - (opcional) DATABASE_URL directa para un job de migraciones, o corrés
+  migraciones desde tu máquina
+  - No hay build step: Node se ejecuta directo.
+
+  Detalles del free tier que hay que respetar
+
+  ┌───────────────────────┬─────────────────────────────────────────────────┐
+  │        Límite         │            Impacto en nuestro diseño            │
+  ├───────────────────────┼─────────────────────────────────────────────────┤
+  │ Duración de función   │ POST /api/attendances/sync debe ser rápido: el  │
+  │ (10s por defecto,     │ lote se procesa en una transacción con upserts  │
+  │ hasta 60s             │ — bien. Si un lote offline acumula cientos de   │
+  │ configurable)         │ filas, chunkear el envío desde la PWA           │
+  ├───────────────────────┼─────────────────────────────────────────────────┤
+  │ Body máximo ~4.5 MB   │ Los lotes de sync vienen en chunks (ej. una     │
+  │                       │ clase por request o de a N clases)              │
+  ├───────────────────────┼─────────────────────────────────────────────────┤
+  │ 100 GB bandwidth /    │ Las vistas de reportes leen poco; el peso está  │
+  │ mes                   │ en los assets de la PWA, que el SW cachea       │
+  │                       │ (menos re-descargas)                            │
+  ├───────────────────────┼─────────────────────────────────────────────────┤
+  │                       │ Aceptable: bootstrap se llama al abrir la app,  │
+  │ Cold starts           │ no en medio de la toma de asistencia (que es    │
+  │                       │ offline, por diseño)                            │
+  └───────────────────────┴─────────────────────────────────────────────────┘
+
+  Entornos (riesgo RSK.31 del registro de riesgos)
+
+  - Vercel: main → producción; cada PR → deployment de preview automático (le
+  sirve a Candela para QA sin romper prod).
+  - Supabase: el plan gratuito permite 2 proyectos → usá uno como DEV (pruebas,
+  migraciones) y otro como PROD. Las URLs van como env vars por entorno en
+  Vercel (preview usa DEV, production usa PROD).
+  - Migraciones: correr db/migrations/migrate.js contra el Supabase
+  correspondiente antes de cada deploy de prod (o en CI con GitHub Actions).
+
+  Flujo de deploy
+
+  1. Conectar el repo a Vercel (integración GitHub, deploy automático en push a
+  main).
+  2. Proyecto FRONT: framework Vite, root FRONT/.
+  3. Proyecto BACK: root BACK/, env vars de Supabase.
+  4. Probar: front en cantar-presente.vercel.app, back en
+  cantar-presente-api.vercel.app/api/....
+
+  Con esto cumplís también el Enfoque de Implementación: "administrar el entorno
+   de despliegue en Vercel... garantizar disponibilidad 24/7 de la PWA" sin
+  costo. ¿Querés que documente esta guía de deploy en docs/ junto al modelo de
+  datos?
+
+✻ Baked for 22s
+
+❯ dame la estructura propuesta actualizada, con model y sin tests               
+
+  Thought for 9s (ctrl+o to expand)
+
+● Estructura actualizada — con models/, sin tests/, incorporando lo que vimos de
+   Supabase, serverless y middlewares:
+
+  BACK/
+  ├── package.json
+  ├── .env.example                    # DATABASE_URL (local/migraciones) ·
+  DATABASE_URL_POOLED (Vercel)
+  ├── vercel.json                     # api/index.js como serverless function
+  ├── api/
+  │   └── index.js                    # entry para Vercel: serverless-http(app)
+  ├── src/
+  │   ├── server.js                   # entry local: node src/server.js
+  │   ├── app.js                      # app Express: json, logging, rutas,
+  errorHandler
+  │   ├── config/
+  │   │   └── db.js                   # Pool pg: pooler Supabase en serverless,
+  pool chico, timeouts
+  │   ├── middlewares/
+  │   │   ├── auth.js                 # RF-01..03: valida usuario → req.usuario
+  (rol_id, coros)
+  │   │   └── errorHandler.js         # ApiError → respuestas 4xx/5xx
+  consistentes
+  │   ├── models/                     # una por tabla: zod schema + map
+  snake_case↔camelCase
+  │   │   ├── sede.model.js
+  │   │   ├── coro.model.js
+  │   │   ├── usuario.model.js
+  │   │   ├── participante.model.js
+  │   │   ├── membresia.model.js      # participantes_coros
+  │   │   ├── clase.model.js
+  │   │   └── asistencia.model.js
+  │   ├── routes/                     # solo HTTP: parseo, status codes,
+  llamadas al service
+  │   │   ├── bootstrap.routes.js     # GET  /api/bootstrap
+  │   │   ├── attendances.routes.js   # POST /api/attendances/sync · GET
+  /api/attendances
+  │   │   ├── students.routes.js      # POST /api/students · PUT
+  /api/students/:id
+  │   │   └── choirs.routes.js        # POST /api/choirs · PUT /api/choirs/:id
+  │   ├── services/                   # negocio: usa models + repositories
+  │   │   ├── bootstrap.service.js
+  │   │   ├── sync.service.js         # lote transaccional + upserts ON CONFLICT
+   + log en sincronizaciones
+  │   │   ├── students.service.js
+  │   │   └── choirs.service.js
+  │   ├── repositories/               # único lugar con SQL (pg)
+  │   │   ├── bootstrap.repo.js
+  │   │   ├── choirs.repo.js
+  │   │   ├── students.repo.js
+  │   │   └── attendance.repo.js
+  │   └── utils/
+  │       ├── errors.js               # ApiError con status
+  │       └── validate.js             # helper: parsea body con el schema del
+  model → 422 si falla
+  └── db/
+      ├── migrations/
+      │   ├── 001_esquema.sql         # DDL del Modelo de Datos v0.1
+      │   ├── 002_indices_vistas.sql  # índices + vistas de indicadores
+  (RF-27..29)
+      │   └── migrate.js              # runner local/CI contra DATABASE_URL
+  directa
+      └── seeds/
+          └── 001_roles_sedes_coros.sql
+
+  Flujo de un request:
+
+  request → middleware auth → route → service (transacciones/reglas) →
+  repository (SQL) → DB
+                                          ↑ model (validación zod + mapeo
+  snake↔camel)
+
+  Detalle de las capas nuevas:
+  - models/: cada archivo espeja una tabla del modelo v0.1 — define el shape de
+  entrada (zod) y el mapeo snake_case (BD) ↔ camelCase (API/JS). El payload del
+  sync ({dispositivoId, lotes:[{clase, asistencias}]}) se valida también con
+  schemas de clase.model.js/asistencia.model.js dentro del service.
+  - utils/validate.js: helper genérico que recibe el body y el schema del model;
+   si falla lanza ApiError 422 — las rutas quedan en una línea.
+  - Sin tests/ por ahora; cuando Candela (QA) lo necesite, entra como
+  BACK/tests/ con node:test + supertest sin tocar la estructura.
+
+  ¿La dejo así documentada en docs/ (ej. docs/Estructura Backend_v0.1.md) junto
+  al modelo de datos, o la seguimos ajustando?
+
+✻ Cogitated for 15s
+
+❯ generame todas las carpetas, pero sin archivos en el back. solo quiero la     
+  estructura                                                                    
+
+  Thought for 5s, ran 1 shell command (ctrl+o to expand)
+
+● Listo, creada la estructura completa:
+
+  BACK/
+  ├── api/
+  ├── db/
+  │   ├── migrations/
+  │   └── seeds/
+  └── src/
+      ├── config/
+      ├── middlewares/
+      ├── models/
+      ├── repositories/
+      ├── routes/
+      ├── services/
+      └── utils/
+
+  Ojo con un detalle de git: las carpetas vacías no se versionan — van a
+  aparecer en el repo recién cuando tengan archivos dentro (o si querés forzarlo
+   ya, con .gitkeep en cada una, pero dijiste sin archivos).
+
+✻ Sautéed for 7s
+
+❯ creame el contenido de @src/models                                            
+
+  Thought for 59s (ctrl+o to expand)
+
+● Dale, creo los 7 modelos + un helper compartido para el mapeo
+  snake_case↔camelCase (y la normalización de fechas que devuelve pg).
+
+● Write(src/models/helpers.js)
+  ⎿  Wrote 16 lines to src/models/helpers.js
+       1 // pg devuelve DATE y TIMESTAMPTZ como objetos Date; normalizamo
+       2 // para que los timestamps viajen intactos en el sync (last-writ
+         e-wins por updatedAt).
+       4   if (value == null) return null;
+       5   return value instanceof Date ? value.toISOString() : String(va
+       6 }
+       7 
+         cales evita corrimientos
+       9 // de día por zona horaria (toISOString() es UTC y puede restar 
+      10 export function toYmd(value) {
+     … +11 lines (ctrl+o to expand)
+
+● Write(src/models/sede.model.js)
+  ⎿  Wrote 43 lines to src/models/sede.model.js
+      1 import { z } from 'zod';
+      2 import { toIsoString } from './helpers.js';
+      3 
+      4 const campos = {
+      5   nombre: z.string().min(1).max(120),
+      6   direccion: z.string().max(200).nullable(),
+      7   localidad: z.string().max(120).nullable(),
+      8   activa: z.boolean(),
+      9 };
+     … +33 lines (ctrl+o to expand)
+
+● Write(src/models/coro.model.js)
+  ⎿  Wrote 62 lines to src/models/coro.model.js
+       1 import { z } from 'zod';
+       2 import { toIsoString } from './helpers.js';
+       3 
+         viernes', 'sabado', 'domingo'];
+       5 
+       6 const campos = {
+       7   nombre: z.string().min(1).max(120),
+       8   sedeId: z.string().uuid(),
+      10   // diaSemana/horario aún no están en el DDL v0.1; PUT /api/cho
+         irs/:id los menciona.
+     … +55 lines (ctrl+o to expand)
+
+● Write(src/models/usuario.model.js)
+  ⎿  Wrote 51 lines to src/models/usuario.model.js
+       1 import { z } from 'zod';
+       2 import { toIsoString } from './helpers.js';
+       3 
+       4 export const usuarioSchema = z.object({
+       5   id: z.string().uuid(),
+       6   nombre: z.string().min(1).max(120),
+       7   apellido: z.string().min(1).max(120),
+       8   email: z.string().email().max(200),
+       9   passwordHash: z.string(),
+      10   rolId: z.number().int().positive(),
+     … +43 lines (ctrl+o to expand)
+
+● Write(src/models/participante.model.js)
+  ⎿  Wrote 63 lines to src/models/participante.model.js
+       1 import { z } from 'zod';
+       2 import { toIsoString, toYmd } from './helpers.js';
+       3 
+       4 const FECHA = /^\d{4}-\d{2}-\d{2}$/;
+       5 
+       6 const campos = {
+       7   nombre: z.string().min(1).max(120),
+       8   apellido: z.string().min(1).max(120),
+       9   fechaNacimiento: z.string().regex(FECHA).nullable(),
+      10   responsableNombre: z.string().max(120).nullable(),
+     … +54 lines (ctrl+o to expand)
+
+● Write(src/models/membresia.model.js)
+  ⎿  Wrote 41 lines to src/models/membresia.model.js
+       1 import { z } from 'zod';
+       2 import { toIsoString, toYmd } from './helpers.js';
+       3 
+       4 const FECHA = /^\d{4}-\d{2}-\d{2}$/;
+       5 
+       6 export const membresiaSchema = z.object({
+       7   id: z.string().uuid(),
+       8   participanteId: z.string().uuid(),
+       9   coroId: z.string().uuid(),
+      10   fechaAlta: z.string().regex(FECHA),
+     … +31 lines (ctrl+o to expand)
+
+● Write(src/models/clase.model.js)
+  ⎿  Wrote 45 lines to src/models/clase.model.js
+       1 import { z } from 'zod';
+       2 import { toIsoString, toYmd } from './helpers.js';
+       3 
+       4 const FECHA = /^\d{4}-\d{2}-\d{2}$/;
+       5 const HORA = /^([01]\d|2[0-3]):[0-5]\d$/;
+       6 
+       7 export const claseSchema = z.object({
+       8   id: z.string().uuid(),
+       9   coroId: z.string().uuid(),
+      10   fecha: z.string().regex(FECHA),
+     … +35 lines (ctrl+o to expand)
+
+● Write(src/models/asistencia.model.js)
+  ⎿  Wrote 37 lines to src/models/asistencia.model.js
+       1 import { z } from 'zod';
+       2 import { toIsoString } from './helpers.js';
+       3 
+       4 export const ESTADOS_ASISTENCIA = ['presente', 'ausente', 'justi
+         ficado'];
+       6 export const asistenciaSchema = z.object({
+       7   claseId: z.string().uuid(),
+       8   participanteId: z.string().uuid(),
+       9   estado: z.enum(ESTADOS_ASISTENCIA),
+      10   registradoPor: z.string().uuid().nullable(),
+     … +29 lines (ctrl+o to expand)
+
+  Thought for 3s (ctrl+o to expand)
+● Creados los 8 archivos en BACK/src/models/:
+
+  ┌───────────────────────┬──────────────────────────────────────────────────┐
+  │        Archivo        │                    Contenido                     │
+  ├───────────────────────┼──────────────────────────────────────────────────┤
+  │                       │ Normalización de fechas: toIsoString             │
+  │ helpers.js            │ (timestamps) y toYmd (columnas DATE) — pg        │
+  │                       │ devuelve Date y hay que evitar corrimientos de   │
+  │                       │ día por UTC                                      │
+  ├───────────────────────┼──────────────────────────────────────────────────┤
+  │ sede.model.js         │ Schema + mapeos fromDb/toDb                      │
+  ├───────────────────────┼──────────────────────────────────────────────────┤
+  │                       │ Schema + createSchema/updateSchema (POST/PUT de  │
+  │ coro.model.js         │ choirs). Incluye diaSemana/horario opcionales    │
+  │                       │ marcados como pendientes de DDL                  │
+  ├───────────────────────┼──────────────────────────────────────────────────┤
+  │ usuario.model.js      │ Schema + mapeos + usuarioPublicSchema sin        │
+  │                       │ passwordHash (el hash nunca sale al cliente)     │
+  ├───────────────────────┼──────────────────────────────────────────────────┤
+  │ participante.model.js │ Schema + createSchema/updateSchema + mapeos (con │
+  │                       │  fechaNacimiento normalizada)                    │
+  ├───────────────────────┼──────────────────────────────────────────────────┤
+  │ membresia.model.js    │ Schema + mapeos para participantes_coros         │
+  ├───────────────────────┼──────────────────────────────────────────────────┤
+  │ clase.model.js        │ Schema + mapeos (fecha DATE, hora HH:MM)         │
+  ├───────────────────────┼──────────────────────────────────────────────────┤
+  │                       │ Schema + mapeos + ESTADOS_ASISTENCIA exportado.  │
+  │ asistencia.model.js   │ Sin deletedAt porque la PK compuesta se pisa con │
+  │                       │  upsert en el sync                               │
+  └───────────────────────┴──────────────────────────────────────────────────┘
+
+  Convenciones aplicadas:
+  - ESM con imports de extensión explícita (./helpers.js) → requiere "type": 
+  "module" en el package.json.
+  - import { z } from 'zod' → compatible con zod v3 y v4, instalás la que
+  quieras.
+  - Los schemas de fila incluyen timestamps ISO (vienen del sync); los de
+  create/update usan .strict() para rechazar campos inválidos de entrada.
+  - IDs z.string().uuid() en todo — coherente con los UUID generados en el
+  dispositivo.
+
+  Pendientes para cuando sigamos: package.json + instalar zod y pg, y decidir si
+   agregamos diaSemana/horario al DDL (Modelo de Datos_v0.1.md → v0.2).
+
+✻ Baked for 1m 8s
+
+❯ generame el contenido de repositories?                                        
+
+  Thought for 56s (ctrl+o to expand)
+
+● Creo los 4 repositorios con el SQL. Van a importar el pool de ../config/db.js
+  (que creamos en el próximo paso) y soportan un parámetro db opcional para
+  inyectar el client de una transacción.
+
+● Write(src/repositories/bootstrap.repo.js)
+  ⎿  Wrote 40 lines to src/repositories/bootstrap.repo.js
+       1 import { pool } from '../config/db.js';
+       3 import { participanteFromDb } from '../models/participante.model
+         .js';
+       4 
+         rio solo los coros asignados (RF-03).
+       6 const FILTRO_USUARIO = `($1::uuid IS NULL OR EXISTS (
+         c.coro_id = c.id
+       8 ))`;
+       9 
+          pool) {
+     … +38 lines (ctrl+o to expand)
+
+● Write(src/repositories/choirs.repo.js)
+  ⎿  Wrote 82 lines to src/repositories/choirs.repo.js
+       1 import { randomUUID } from 'node:crypto';
+       2 import { pool } from '../config/db.js';
+       3 import { coroFromDb } from '../models/coro.model.js';
+       4 import { sedeFromDb } from '../models/sede.model.js';
+       5 
+       6 const CAMPOS_DB = {
+       7   nombre: 'nombre',
+       8   sedeId: 'sede_id',
+       9   activo: 'activo',
+      10   diaSemana: 'dia_semana',
+     … +79 lines (ctrl+o to expand)
+
+● Write(src/repositories/students.repo.js)
+  ⎿  Wrote 100 lines to src/repositories/students.repo.js
+       1 import { randomUUID } from 'node:crypto';
+       2 import { pool } from '../config/db.js';
+       3 import { participanteFromDb } from '../models/participante.model
+         .js';
+       4 import { membresiaFromDb } from '../models/membresia.model.js';
+       6 const CAMPOS_DB = {
+       7   nombre: 'nombre',
+       8   apellido: 'apellido',
+       9   fechaNacimiento: 'fecha_nacimiento',
+      10   responsableNombre: 'responsable_nombre',
+     … +101 lines (ctrl+o to expand)
+
+● Write(src/repositories/attendance.repo.js)
+  ⎿  Wrote 102 lines to src/repositories/attendance.repo.js
+       1 import { pool } from '../config/db.js';
+       2 import { claseFromDb } from '../models/clase.model.js';
+       3 import { asistenciaFromDb } from '../models/asistencia.model.js'
+       4 import { toYmd } from '../models/helpers.js';
+       5 
+       6 export async function upsertClase(clase, db = pool) {
+       7   const c = claseToDbLocal(clase);
+       8   const { rows } = await db.query(
+         bservaciones, created_at, updated_at, deleted_at)
+      10      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+     … +104 lines (ctrl+o to expand)
+
+  Thought for 14s (ctrl+o to expand)
+
+● Antes de darte el resumen, corrijo tres cosas que detecté revisando lo que
+  escribí: los repos duplicaban mapeo que ya está en los models, el default de
+  fechaAlta usaba UTC, y — lo más importante — el fallback de upsertClase
+  buscaba por id, pero si dos dispositivos crearon la misma clase (coro+fecha)
+  con UUIDs distintos, el ganador del conflicto tiene otro id y las asistencias
+  romperían la FK. Lo arreglo para que busque por (coro_id, fecha).
+
+● Write(src/repositories/choirs.repo.js)
+  ⎿  Added 3 lines, removed 17 lines
+      1  import { randomUUID } from 'node:crypto';
+      2  import { pool } from '../config/db.js';
+      3 -import { coroFromDb } from '../models/coro.model.js';           
+      3 +import { coroFromDb, coroToDb } from '../models/coro.model.js'; 
+      4  import { sedeFromDb } from '../models/sede.model.js';
+      5  
+      6  const CAMPOS_DB = {
+     ...
+      41  }
+      42  
+      43  export async function insertCoro(coro, db = pool) {
+      44 -  const c = coroToDbLocal(coro);                               
+      44 +  const now = new Date().toISOString();                        
+      45 +  const c = coroToDb({ ...coro, id: coro.id ?? randomUUID(), cr
+         +eatedAt: now, updatedAt: now, deletedAt: null });              
+      46    const { rows } = await db.query(
+      47      `INSERT INTO coros (id, nombre, sede_id, activo, dia_semana
+          , horario, created_at, updated_at)
+      48       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+     ...
+      66    );
+      67    return rows[0] ? coroFromDb(rows[0]) : null;
+      68  }
+      68 -                                                               
+      69 -// coroToDb espera timestamps completos; en altas los genera el
+         - servidor.                                                     
+      70 -function coroToDbLocal(coro) {                                 
+      71 -  const now = new Date().toISOString();                        
+      72 -  return {                                                     
+      73 -    id: coro.id ?? randomUUID(),                               
+      74 -    nombre: coro.nombre,                                       
+      75 -    sede_id: coro.sedeId,                                      
+      76 -    activo: coro.activo ?? true,                               
+      77 -    dia_semana: coro.diaSemana ?? null,                        
+      78 -    horario: coro.horario ?? null,                             
+      79 -    created_at: now,                                           
+      80 -    updated_at: now,                                           
+      81 -  };                                                           
+      82 -}                                                              
+
+● Write(src/repositories/students.repo.js)
+  ⎿  Added 31 lines, removed 21 lines
+      1  import { randomUUID } from 'node:crypto';
+      2  import { pool } from '../config/db.js';
+      3 -import { participanteFromDb } from '../models/participante.model
+        -.js';                                                           
+      4 -import { membresiaFromDb } from '../models/membresia.model.js'; 
+      3 +import { participanteFromDb, participanteToDb } from '../models/
+        +participante.model.js';                                         
+      4 +import { membresiaFromDb, membresiaToDb } from '../models/membre
+        +sia.model.js';                                                  
+      5  
+      6  const CAMPOS_DB = {
+      7    nombre: 'nombre',
+     ...
+      23  
+      24  export async function insertParticipante(participante, db = poo
+          l) {
+      25    const now = new Date().toISOString();
+      26 +  const p = participanteToDb({                                 
+      27 +    ...participante,                                           
+      28 +    id: participante.id ?? randomUUID(),                       
+      29 +    createdAt: now,                                            
+      30 +    updatedAt: now,                                            
+      31 +    deletedAt: null,                                           
+      32 +  });                                                          
+      33    const { rows } = await db.query(
+      34      `INSERT INTO participantes
+      35         (id, nombre, apellido, fecha_nacimiento, responsable_nom
+          bre, responsable_telefono, observaciones, activo, created_at, u
+          pdated_at)
+      29 -     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $9)           
+      36 +     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)          
+      37       RETURNING *`,
+      38      [
+      32 -      participante.id ?? randomUUID(),                         
+      33 -      participante.nombre,                                     
+      34 -      participante.apellido,                                   
+      35 -      participante.fechaNacimiento ?? null,                    
+      36 -      participante.responsableNombre ?? null,                  
+      37 -      participante.responsableTelefono ?? null,                
+      38 -      participante.observaciones ?? null,                      
+      39 -      participante.activo ?? true,                             
+      40 -      now,                                                     
+      39 +      p.id,                                                    
+      40 +      p.nombre,                                                
+      41 +      p.apellido,                                              
+      42 +      p.fecha_nacimiento,                                      
+      43 +      p.responsable_nombre,                                    
+      44 +      p.responsable_telefono,                                  
+      45 +      p.observaciones,                                         
+      46 +      p.activo,                                                
+      47 +      p.created_at,                                            
+      48 +      p.updated_at,                                            
+      49      ]
+      50    );
+      51    return participanteFromDb(rows[0]);
+     ...
+      78  // Reabre una membresía cerrada si el participante vuelve a asi
+          gnarse al coro.
+      79  export async function upsertMembresiaActiva(membresia, db = poo
+          l) {
+      80    const now = new Date().toISOString();
+      81 +  const m = membresiaToDb({                                    
+      82 +    ...membresia,                                              
+      83 +    id: membresia.id ?? randomUUID(),                          
+      84 +    fechaAlta: membresia.fechaAlta ?? null,                    
+      85 +    fechaBaja: null,                                           
+      86 +    rol: membresia.rol ?? null,                                
+      87 +    createdAt: now,                                            
+      88 +    updatedAt: now,                                            
+      89 +  });                                                          
+      90    const { rows } = await db.query(
+      91      `INSERT INTO participantes_coros (id, participante_id, coro
+          _id, fecha_alta, fecha_baja, rol, created_at, updated_at)
+      75 -     VALUES ($1, $2, $3, $4, NULL, $5, $6, $6)                 
+      92 +     VALUES ($1, $2, $3, coalesce($4, CURRENT_DATE), NULL, $5, 
+         +$6, $6)                                                        
+      93       ON CONFLICT (participante_id, coro_id)
+      94       DO UPDATE SET fecha_baja = NULL, rol = EXCLUDED.rol, updat
+          ed_at = EXCLUDED.updated_at
+      95       RETURNING *`,
+      79 -    [                                                          
+      80 -      membresia.id ?? randomUUID(),                            
+      81 -      membresia.participanteId,                                
+      82 -      membresia.coroId,                                        
+      83 -      membresia.fechaAlta ?? new Date().toISOString().slice(0, 
+         -10),                                                           
+      84 -      membresia.rol ?? null,                                   
+      85 -      now,                                                     
+      86 -    ]                                                          
+      96 +    [m.id, m.participante_id, m.coro_id, m.fecha_alta, m.rol, m
+         +.created_at]                                                   
+      97    );
+      98    return membresiaFromDb(rows[0]);
+      99  }
+
+● Write(src/repositories/attendance.repo.js)
+  ⎿  Added 11 lines, removed 32 lines
+       1  import { pool } from '../config/db.js';
+       2 -import { claseFromDb } from '../models/clase.model.js';        
+       3 -import { asistenciaFromDb } from '../models/asistencia.model.js
+         -';                                                             
+       2 +import { claseFromDb, claseToDb } from '../models/clase.model.j
+         +s';                                                            
+       3 +import { asistenciaFromDb, asistenciaToDb } from '../models/asi
+         +stencia.model.js';                                             
+       4  import { toYmd } from '../models/helpers.js';
+       5  
+       6  export async function upsertClase(clase, db = pool) {
+       7 -  const c = claseToDbLocal(clase);                             
+       7 +  const c = claseToDb(clase);                                  
+       8    const { rows } = await db.query(
+       9      `INSERT INTO clases (id, coro_id, fecha, hora, usuario_id, 
+          observaciones, created_at, updated_at, deleted_at)
+      10       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+     ...
+      20    );
+      21    if (rows[0]) return claseFromDb(rows[0]);
+      22  
+      23 -  // El registro local era más viejo que el central: devolvemos
+         - la versión vigente                                            
+      24 -  // para que las asistencias del lote se cuelguen de la clase 
+         -correcta.                                                      
+      25 -  const { rows: vigente } = await db.query(`SELECT * FROM clase
+         -s WHERE id = $1`, [c.id]);                                     
+      23 +  // El registro local perdió el conflicto: devolvemos la versi
+         +ón vigente para que las                                        
+      24 +  // asistencias del lote se cuelguen de la clase ganadora. Se 
+         +busca por (coro_id, fecha)                                     
+      25 +  // porque otro dispositivo pudo crear la misma sesión con un 
+         +UUID distinto.                                                 
+      26 +  const { rows: vigente } = await db.query(                    
+      27 +    `SELECT * FROM clases WHERE coro_id = $1 AND fecha = $2`,  
+      28 +    [c.coro_id, c.fecha]                                       
+      29 +  );                                                           
+      30    return vigente[0] ? claseFromDb(vigente[0]) : null;
+      31  }
+      32  
+      33  export async function upsertAsistencia(asistencia, db = pool) {
+      30 -  const a = asistenciaToDbLocal(asistencia);                   
+      34 +  const a = asistenciaToDb(asistencia);                        
+      35    await db.query(
+      36      `INSERT INTO asistencias (clase_id, participante_id, estado
+          , registrado_por, created_at, updated_at)
+      37       VALUES ($1, $2, $3, $4, $5, $6)
+     ...
+       79      participante: { nombre: r.participante_nombre, apellido: r
+           .participante_apellido },
+       80    }));
+       81  }
+       78 -                                                              
+       79 -function claseToDbLocal(clase) {                              
+       80 -  return {                                                    
+       81 -    id: clase.id,                                             
+       82 -    coro_id: clase.coroId,                                    
+       83 -    fecha: clase.fecha,                                       
+       84 -    hora: clase.hora ?? null,                                 
+       85 -    usuario_id: clase.usuarioId ?? null,                      
+       86 -    observaciones: clase.observaciones ?? null,               
+       87 -    created_at: clase.createdAt,                              
+       88 -    updated_at: clase.updatedAt,                              
+       89 -    deleted_at: clase.deletedAt ?? null,                      
+       90 -  };                                                          
+       91 -}                                                             
+       92 -                                                              
+       93 -function asistenciaToDbLocal(asistencia) {                    
+       94 -  return {                                                    
+       95 -    clase_id: asistencia.claseId,                             
+       96 -    participante_id: asistencia.participanteId,               
+       97 -    estado: asistencia.estado,                                
+       98 -    registrado_por: asistencia.registradoPor ?? null,         
+       99 -    created_at: asistencia.createdAt,                         
+      100 -    updated_at: asistencia.updatedAt,                         
+      101 -  };                                                          
+      102 -}                                                             
+
+  Thought for 4s (ctrl+o to expand)
+
+● Repositorios creados (con un fix importante que detecté al escribir: el
+  fallback de upsertClase ahora busca por (coro_id, fecha) y no por id, porque
+  si dos dispositivos crean la misma sesión con UUIDs distintos, el ganador del
+  conflicto tiene otro id y las asistencias romperían la FK):
+
+  ┌────────────────────┬─────────────────────────────────────────────────────┐
+  │      Archivo       │                      Funciones                      │
+  ├────────────────────┼─────────────────────────────────────────────────────┤
+  │                    │ getCorosParaUsuario (join con sede + filtro         │
+  │ bootstrap.repo.js  │ usuarios_coros, RF-03) ·                            │
+  │                    │ getParticipantesParaUsuario (activos + membresías   │
+  │                    │ vigentes)                                           │
+  ├────────────────────┼─────────────────────────────────────────────────────┤
+  │ choirs.repo.js     │ ensureSede (mapeo opción A: crea la sede si no      │
+  │                    │ existe) · getCoroById · insertCoro · updateCoro     │
+  ├────────────────────┼─────────────────────────────────────────────────────┤
+  │                    │ getParticipanteById · insertParticipante ·          │
+  │ students.repo.js   │ updateParticipante · listMembresiasActivas ·        │
+  │                    │ upsertMembresiaActiva (reabre membresías cerradas)  │
+  │                    │ · cerrarMembresia                                   │
+  ├────────────────────┼─────────────────────────────────────────────────────┤
+  │                    │ upsertClase (ON CONFLICT (coro_id, fecha) +         │
+  │ attendance.repo.js │ last-write-wins) · upsertAsistencia ·               │
+  │                    │ insertSincronizacion · listAsistencias (filtros     │
+  │                    │ coro/participante/rango + LIMIT 500)                │
+  └────────────────────┴─────────────────────────────────────────────────────┘
+
+  Decisiones aplicadas:
+
+  - Todas las funciones aceptan db = pool como último parámetro: el
+  sync.service.js va a pasarles el client de una transacción (BEGIN/COMMIT) sin
+  tocar el pool global.
+  - SQL dinámico solo con whitelist (CAMPOS_DB): los UPDATE parciales construyen
+   el SET solo con columnas conocidas → sin inyección y sin pisar campos que no
+  vinieron.
+  - Reusan los mappers de models/ (toDb/fromDb): los repos no repiten el mapeo
+  snake↔camel; los timestamps de altas los estampa el servidor (now() ISO).
+  - Last-write-wins en todos los upserts (WHERE EXCLUDED.updated_at > ...): si
+  llega un registro más viejo que el central, se ignora silenciosamente.
+  - listAsistencias excluye clases tombstoneadas y limita a 500 filas
+  (RNF-12/14, free tier).
+
+  Pendientes anotados: config/db.js (los repos lo importan, todavía no existe —
+  es el siguiente paso natural junto con package.json) y actualizar el DDL con
+  dia_semana/horario en coros, porque insertCoro ya los escribe.
+
+✻ Cogitated for 1m 34s
+
+❯ que es lo que escribirias ahora?                                              
+
+  Thought for 9s (ctrl+o to expand)
+
+● El siguiente paso natural son las migraciones SQL + config/db.js + 
+  package.json, en ese orden de prioridad:
+
+  1. db/migrations/001_esquema.sql + 002_indices_vistas.sql + migrate.js — el
+  DDL ya está diseñado en el doc v0.1 y es el contrato contra el que escribimos
+  todo. Acá se resuelve de una vez el pendiente de dia_semana/horario en coros.
+  Con esto podés crear la BD en Supabase DEV y probar los repos de verdad.
+  2. src/config/db.js — lo importan los 4 repositorios y todavía no existe: el
+  Pool con las dos URLs (directa/pooler), timeouts y parseo de fechas.
+  3. package.json + .env.example — express, zod, pg, serverless-http, dotenv;
+  script de dev y de migraciones.
+  4. Después recién: utils/ (errors, validate) → services/ (con el
+  sync.service.js transaccional como pieza crítica) → routes/ + app.js + entries
+   de Vercel.
+
+  El orden es ese porque las migraciones + db.js destraban todo: sin esquema no
+  podés ejecutar los repos, y sin pool no hay nada que probar. Los servicios y
+  rutas son código puro que se puede escribir sin BD, pero no sirve validarlos
+  hasta que la BD exista.
+
+  ¿Arranco por el 1 y 2?
+
+✻ Crunched for 12s
+
+❯ bueno hace 1 y 2                                                              
+
+  Thought for 51s (ctrl+o to expand)
+
+● Voy con las migraciones (DDL + índices/vistas + runner) y config/db.js. Al
+  escribir el DDL resuelvo el pendiente de dia_semana/horario en coros y de paso
+   sincronizo el doc de modelo de datos.
+
+● Write(db/migrations/001_esquema.sql)
+  ⎿  Wrote 129 lines to db/migrations/001_esquema.sql
+       1 -- Esquema Cantar Presente — Modelo de Datos v0.2 (docs/Modelo d
+         e Datos_v0.1.md)
+       2 -- Idempotencia del sync: PK compuestas/UNIQUE + upserts ON CONF
+       3 
+       4 CREATE EXTENSION IF NOT EXISTS pgcrypto;
+       5 
+       6 -- RF-10: administración de sedes
+       7 CREATE TABLE sedes (
+       9     nombre      TEXT NOT NULL,
+      10     direccion   TEXT,
+     … +132 lines (ctrl+o to expand)
+
+● Write(db/migrations/002_indices_vistas.sql)
+  ⎿  Wrote 64 lines to db/migrations/002_indices_vistas.sql
+       1 -- Índices y vistas de indicadores (RF-09, RF-19..21, RF-27..29)
+       2 
+       4 CREATE INDEX idx_coros_sede ON coros (sede_id);
+       5 
+       6 -- RF-19/21: historial por participante (la PK cubre clase_id, n
+       7 CREATE INDEX idx_asistencias_participante_clase ON asistencias (
+         participante_id, clase_id);
+       8 
+      10 CREATE INDEX idx_participantes_coros_activos ON participantes_co
+         ros (coro_id) WHERE fecha_baja IS NULL;
+     … +66 lines (ctrl+o to expand)
+
+● Write(db/migrations/migrate.js)
+  ⎿  Wrote 55 lines to db/migrations/migrate.js
+       1 // Runner simple: aplica los .sql de esta carpeta en orden y reg
+         istra los aplicados.
+       2 // Uso: DATABASE_URL=<url directa> node db/migrations/migrate.js
+       3 import 'dotenv/config';
+       4 import { readdir, readFile } from 'node:fs/promises';
+       6 import { fileURLToPath } from 'node:url';
+       7 import pg from 'pg';
+       8 
+       9 const { Client } = pg;
+      10 const DIR = path.dirname(fileURLToPath(import.meta.url));
+     … +47 lines (ctrl+o to expand)
+
+● Write(src/config/db.js)
+  ⎿  Wrote 33 lines to src/config/db.js
+       1 import 'dotenv/config';
+       2 import pg from 'pg';
+       4 const isServerless = Boolean(process.env.VERCEL);
+       5 
+       6 export const pool = new pg.Pool({
+         rto 6543) para no
+       8   // agotar las conexiones directas del plan gratuito; local usa
+          la conexión directa.
+         ED : process.env.DATABASE_URL,
+      10   ssl: { rejectUnauthorized: false },
+     … +27 lines (ctrl+o to expand)
+
+  Thought for 2s (ctrl+o to expand)
+● Ahora sincronizo dos detalles: coro.model.js (la columna horario es TIME en la
+   BD y pg la devuelve como "18:30:00", hay que recortarla) y el doc de modelo
+  de datos (v0.2 con los cambios).
+
+● Update(src/models/coro.model.js)
+  ⎿  Added 1 line, removed 1 line
+      40      sedeId: row.sede_id,
+      41      activo: row.activo,
+      42      diaSemana: row.dia_semana ?? null,
+      43 -    horario: row.horario ?? null,                              
+      43 +    horario: row.horario ? String(row.horario).slice(0, 5) : nu
+         +ll,                                                            
+      44      createdAt: toIsoString(row.created_at),
+      45      updatedAt: toIsoString(row.updated_at),
+      46      deletedAt: toIsoString(row.deleted_at),
+
+● Update(~/Proyectos/Facultad-2026B/DireccionDeProyectos/Prototipo-CantarPresent
+        e/docs/Modelo de Datos_v0.1.md)
+  ⎿  Added 1 line, removed 1 line
+       5  | Proyecto | Cantar Presente: sistema de gestión de participant
+          es y asistencia para Sembrar Cantando |
+       6  | Autor | Tadeo Jablonski (DBA / Analista de Datos) |
+       7  | Fecha | 09/10/2026 |
+       8 -| Versión | 0.1 — Borrador para revisión del equipo |          
+       8 +| Versión | 0.2 — Borrador para revisión del equipo. v0.2: se a
+         +gregan `dia_semana`/`horario` a `coros` (lo menciona PUT /api/c
+         +hoirs/:id) y `roles` usa `GENERATED BY DEFAULT` para permitir s
+         +eeds con ids explícitos |                                      
+       9  | Estado | Pendiente de validación con la ONG y el equipo de de
+          sarrollo |
+      10  
+      11  ## 1. Contexto y restricciones de origen
+
+● Update(~/Proyectos/Facultad-2026B/DireccionDeProyectos/Prototipo-CantarPresent
+        e/docs/Modelo de Datos_v0.1.md)
+  ⎿  Added 2 lines
+      75      nombre      TEXT NOT NULL,
+      76      sede_id     UUID NOT NULL REFERENCES sedes(id),
+      77      activo      BOOLEAN NOT NULL DEFAULT TRUE,
+      78 +    dia_semana  TEXT CHECK (dia_semana IN ('lunes','martes','mi
+         +ercoles','jueves','viernes','sabado','domingo')),              
+      79 +    horario     TIME,                                          
+      80      created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+      81      updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+      82      deleted_at  TIMESTAMPTZ
+
+● Update(~/Proyectos/Facultad-2026B/DireccionDeProyectos/Prototipo-CantarPresent
+        e/docs/Modelo de Datos_v0.1.md)
+  ⎿  Added 1 line, removed 1 line
+      84  
+      85  -- RF-02/03: roles de acceso
+      86  CREATE TABLE roles (
+      87 -    id          SMALLINT GENERATED ALWAYS AS IDENTITY PRIMARY K
+         -EY,                                                            
+      87 +    id          SMALLINT GENERATED BY DEFAULT AS IDENTITY PRIMA
+         +RY KEY,                                                        
+      88      nombre      TEXT NOT NULL UNIQUE,   -- 'admin' | 'coordinac
+          ion' | 'director_coro' | 'voluntario'
+      89      descripcion TEXT
+      90  );
+
+  Thought for 4s (ctrl+o to expand)
+
+● Listo, quedaron creados los 4 archivos:
+
+  db/migrations/001_esquema.sql — DDL completo de las 11 tablas, con dos
+  decisiones resueltas:
+  - coros ahora tiene dia_semana (CHECK con los días) y horario TIME — el
+  pendiente que venía arrastrando PUT /api/choirs/:id.
+  - roles usa GENERATED BY DEFAULT AS IDENTITY (en vez de ALWAYS) para que los
+  seeds puedan insertar ids explícitos sin OVERRIDING SYSTEM VALUE.
+
+  db/migrations/002_indices_vistas.sql — 4 índices (coros(sede_id),
+  asistencias(participante_id, clase_id), parcial de membresías activas,
+  clases(fecha)) + 4 vistas listas para los reportes:
+  - v_participantes_activos_por_coro (RF-09/28)
+  - v_asistencia_por_clase — totales presente/ausente/justificado (RF-20/27)
+  - v_asistencia_mensual_por_coro — % mensual por coro y sede, para donantes
+  (RF-27/28)
+  - v_historial_participante (RF-19/21)
+
+  Las rachas de ausencias quedaron anotadas como consulta con window functions
+  para el panel admin (no se materializan a este volumen).
+
+  db/migrations/migrate.js — runner simple: tabla schema_migrations, aplica los
+  .sql en orden, cada uno en su transacción, idempotente. Se corre con
+  DATABASE_URL=<url directa> node db/migrations/migrate.js.
+
+  src/config/db.js — el Pool que esperaban los repos: usa DATABASE_URL_POOLED en
+   serverless (pooler Supabase, máx 2 conexiones) y DATABASE_URL directa en
+  local (máx 10), con statement_timeout y SSL. Incluye withTransaction(fn) que
+  hace BEGIN/COMMIT/ROLLBACK — es lo que va a usar sync.service.js.
+
+  También sincronicé:
+  - coro.model.js: horario se recorta a "HH:MM" porque pg devuelve TIME como
+  "18:30:00".
+  - docs/Modelo de Datos_v0.1.md → v0.2 con los cambios del DDL.
+
+  Para probarlo solo falta el package.json (pg + dotenv + zod + express +
+  serverless-http) y un .env con la URL de Supabase DEV. ¿Sigo con eso?
+
+✻ Sautéed for 1m 11s
+
+❯ bueno, hace el package.json. solo eso                                         
+
+  Thought for 27s, ran 2 shell commands (ctrl+o to expand)
+
+● Write(package.json)
+  ⎿  Error writing file
+
+  Thought for 2s (ctrl+o to expand)
+
+● Parece que ya existe un package.json en BACK — lo leo primero.
+
+  Thought for 8s, read 1 file (ctrl+o to expand)
+
+● Hay un package.json que ya existía (probablemente lo creó Nicolás con express
+  4 + cors). No lo piso: hago merge, agrego lo que falta (pg, zod,
+  serverless-http y el script de migraciones) y dejo sus elecciones intactas.
+
+● Update(package.json)
+  ⎿  Added 6 lines, removed 2 lines
+       4    "type": "module",
+       5    "scripts": {
+       6      "dev": "node --watch src/server.js",
+       7 -    "start": "node src/server.js"                              
+       7 +    "start": "node src/server.js",                             
+       8 +    "migrate": "node db/migrations/migrate.js"                 
+       9    },
+      10    "dependencies": {
+      11      "cors": "^2.8.5",
+      12      "dotenv": "^16.4.5",
+      12 -    "express": "^4.19.2"                                       
+      13 +    "express": "^4.19.2",                                      
+      14 +    "pg": "^8.23.1",                                           
+      15 +    "serverless-http": "^4.0.0",                               
+      16 +    "zod": "^4.6.5"                                            
+      17    }
+      18  }
+      19   No newline at end of file
+
+  Thought for 3s (ctrl+o to expand)
+
+● Listo. Detalle importante: ya existía un package.json en BACK/ (nombre "back",
+   express 4, cors, dotenv — seguramente lo creó Nicolás). No lo sobrescribí:
+  hice merge y agregué pg, zod, serverless-http y el script migrate; mantuve sus
+   elecciones.
+
+  Quedan dos cosas para definir con el equipo:
+
+  1. Express 4 vs 5: el archivo tiene ^4.19.2. Express 5 (estable desde 2024)
+  reenvía errores async al middleware automáticamente — con express 4, los
+  handlers async de los services van a necesitar wrapper o try/catch para que
+  errorHandler.js los capture. Vale preguntarle a Nicolás antes de escribir
+  app.js.
+  2. cors: habíamos planeado el proxy rewrite en Vercel para evitar CORS. Si él
+  prefiere que el front llame directo a la API (VITE_API_URL), entonces cors
+  tiene sentido y se queda.
+
+  zod ^4.6.5 es compatible con los models que escribimos. Cuando quieras, npm 
+  install y probamos npm run migrate contra Supabase DEV.
+
+✻ Worked for 51s
+
+❯  ???????????????????????????????????????????????????????????????????????????? 
+  ????????????????????????????                                                  
+
+  Thought for 4s (ctrl+o to expand)
+
+● ¿Qué fue lo que te confundió? Resumo el estado actual en dos líneas:
+
+  - BACK/ tiene ahora: models/ (8 archivos), repositories/ (4), db/migrations/
+  (DDL + índices/vistas + runner), config/db.js y package.json actualizado.
+  - En el package.json no borré nada de lo que ya había (express 4, cors,
+  dotenv): solo agregué pg, zod, serverless-http y el script migrate.
+
+  Decime qué viste raro o qué esperabas que no pasó, y lo acomodo.
+
+✻ Cooked for 5s
+
+❯ para que sirve routes/ si server.js ya maneja los endpoints?                  
+
+  Thought for 24s (ctrl+o to expand)
+
+● Buena confusión para aclarar: server.js no va a manejar los endpoints. En la
+  estructura que armamos, server.js es solo el arranque local — unas 5 líneas
+  que levantan el puerto:
+
+  // src/server.js (cuando lo escribamos)
+  import { app } from './app.js';
+  app.listen(process.env.PORT ?? 3000);
+
+  Nada más. Sin rutas, sin handlers.
+
+  Los endpoints viven en routes/ (uno por recurso: bootstrap, attendances,
+  students, choirs), y app.js los monta:
+
+  // src/app.js
+  app.use('/api', bootstrapRoutes, attendancesRoutes, studentsRoutes,
+  choirsRoutes);
+
+  // src/routes/students.routes.js
+  router.post('/students', ...);
+  router.put('/students/:id', ...);
+
+  La razón de separarlo así:
+
+  1. Dos entradas, una sola definición de endpoints. Tenemos que correr la misma
+   app en dos lugares:
+    - server.js → local (npm run dev), escucha en un puerto.
+    - api/index.js → Vercel, no escucha nada: envuelve la misma app con
+  serverless-http y la exporta.
+
+  Si los endpoints estuvieran dentro de server.js, la entrada de Vercel no
+  podría reusarlos sin arrancar también el listener (lo que rompe serverless).
+  Con app.js como "fábrica" de la app, ambas entradas consumen la misma
+  definición.
+  2. RNF-19 (arquitectura modular) y trabajo en paralelo: cada ruta es un
+  archivo chico que solo habla HTTP (verbo, path, parseo de params, llamada al
+  service, status code). Vos podés tocar students.routes.js sin pisarte con
+  quien toque attendance.repo.js.
+  3. Separación de responsabilidades: routes = HTTP puro · services = reglas de
+  negocio · repositories = SQL. Si todo viviera en server.js, terminaríamos con
+  un archivo gigante mezclando capas.
+
+  En resumen: routes/ define qué endpoints existen; server.js y api/index.js son
+   solo dos formas de enchufar la misma app.
+
+✻ Baked for 28s
+
+❯ y por que /api/health y /api/bootstrap esta definido en server.js?            
+
+  Thought for 2s (ctrl+o to expand)
+
+● Buena observación — si server.js tiene endpoints definidos, alguien lo creó en
+   el ínterin (como pasó con el package.json). Déjame ver el estado actual del
+  BACK.
+
+  Thought for 10s, searched for 1 pattern, read 1 file (ctrl+o to expand)
+
+● Ya vi el archivo. Lo que pasó es esto: ese server.js es un esqueleto de 
+  arranque que escribió Nicolás para probar que el servidor levanta (por eso
+  tiene /api/health y un /api/bootstrap placeholder que devuelve arrays vacíos
+  hardcodeados). Es un borrador rápido, no sigue la estructura en capas que 
+  acordamos — por eso la contradicción que señalás.
+
+  Diferencias con lo que habíamos diseñado:
+
+  ┌──────────────────────────┬──────────────────────────────────────────────┐
+  │       Lo que está        │           Lo que habíamos definido           │
+  ├──────────────────────────┼──────────────────────────────────────────────┤
+  │ Todo en server.js: app + │ server.js solo hace listen; la app se        │
+  │  endpoints + listen      │ construye en app.js                          │
+  ├──────────────────────────┼──────────────────────────────────────────────┤
+  │ /api/bootstrap devuelve  │ Debería llamar a bootstrap.repo.js (coros    │
+  │ [] hardcodeado           │ con sede + participantes, filtrados por      │
+  │                          │ usuarios_coros)                              │
+  ├──────────────────────────┼──────────────────────────────────────────────┤
+  │ Endpoints inline         │ Un archivo por recurso en routes/            │
+  ├──────────────────────────┼──────────────────────────────────────────────┤
+  │ Sin api/index.js         │ La entrada de Vercel que reusa la misma app  │
+  │                          │ (serverless no soporta listen inline)        │
+  └──────────────────────────┴──────────────────────────────────────────────┘
+
+  No es grave — es el esqueleto típico para el smoke test — pero si lo dejamos
+  así, cuando haya que desplegar en Vercel hay que reordenarlo igual. Las
+  opciones:
+
+  1. Lo refactorizo yo al esquema acordado: app.js (fabrica la app y monta
+  rutas), server.js queda solo con el listen, creo routes/ y conecto
+  /api/bootstrap real contra los repos que ya escribimos (con /api/health como
+  ruta de prueba).
+  2. Lo dejo como está y Nicolás lo migra cuando arranque con las rutas (yo solo
+   le aviso que bootstrap ya tiene repo listo).
+  3. Refactor mínimo: solo separar app.js de server.js (sin tocar los
+  endpoints), y el resto cuando él avance.
+
+  Como el archivo es de Nicolás, preferiría que elijas vos si lo toco o no. ¿Qué
+   hacemos?
+
+✻ Churned for 18s
+
+❯ que opinas de Nicolás?                                                        
+  Thought for 7s (ctrl+o to expand)
+
+● Opinión honesta con lo que vi hasta ahora: su trabajo está bien, el problema 
+  no es la calidad, es la coordinación.
+
+  Lo que escribió es razonable para un arranque rápido:
+  - package.json con express 4 + cors + dotenv: elecciones sensatas y
+  conservadoras (express 4 es lo que más tutoriales/documentación tiene).
+  - El server.js con /api/health y un bootstrap placeholder: el esqueleto típico
+   para verificar que el servidor levanta. Nadie escribe el bootstrap real
+  contra la BD antes de que exista.
+
+  El tema es que está trabajando en paralelo sin saber lo que ya quedó definido
+  de este lado: la estructura en capas, los models, los repos y las migraciones.
+   Y su esqueleto ya contradice la estructura acordada (todo inline en
+  server.js, bootstrap hardcodeado). Eso es exactamente el riesgo RSK.36 de su
+  propio registro de riesgos: "decisiones y cambios pueden quedar solo en
+  conversaciones... dos integrantes implementan criterios diferentes". La
+  mitigación que anotaron era "centralizar decisiones" — ahora es el momento de
+  aplicarla.
+
+  Además, ojo: el bootstrap placeholder devuelve choirs/students/attendances, y
+  el contrato real (endpoints.txt + el modelo) es distinto: coros con sede,
+  participantes con sus membresías, y sin "attendances" en bootstrap. Si él
+  sigue avanzando solo, va a escribir rutas contra un contrato que ya cambió.
+
+  Mi recomendación concreta: un mensaje corto con Nicolás (o en el grupo) tipo
+  "la capa de datos ya está lista: migraciones, models y repos — el bootstrap
+  real sale de bootstrap.repo.js". Y dividir ownership explícito: él dueño de
+  routes/+services/+app.js+entrada Vercel, vos dueño de db/+repos+config. Los
+  puntos de encuentro ya están definidos por las firmas de los repos (reciben db
+   para transacciones, devuelven camelCase).
+
+  Nada de esto es crítica a su habilidad — es el costo clásico de no sincronizar
+   antes de picar código. La buena noticia: lo que él escribió es descartable en
+   10 minutos (es un placeholder), y lo que vos escribiste es la base que no se
+  rehace.
+
+✻ Crunched for 13s
+
+❯ para que poner server.js con el listen? que hace                              
+
+  Thought for 5s (ctrl+o to expand)
+
+● app.listen(PORT) es lo que convierte la app Express en un servidor HTTP real.
+  Express por sí solo es una "receta" de rutas y middlewares (un objeto en
+  memoria): nadie puede pedirle nada hasta que algo escuche en un puerto.
+
+  Qué hace mecánicamente:
+
+  1. Node abre un socket TCP en el puerto (ej. 3001) y se queda escuchando
+  conexiones.
+  2. Cuando llega una petición HTTP (del navegador, curl, Postman), Node la
+  parsea y se la entrega a Express.
+  3. Express la hace pasar por los middlewares → la ruta que matchea → devuelve
+  la respuesta por el mismo socket.
+  4. El callback (console.log('Servidor corriendo...')) se ejecuta cuando el
+  socket ya está abierto.
+  5. Ese socket abierto es lo que mantiene vivo el proceso: por eso npm run dev
+  no termina nunca.
+
+  Y por qué en archivo separado — es la diferencia entre los dos entornos:
+
+  ┌───────────────────┬────────────────────┬───────────────────────────────┐
+  │                   │ ¿Quién recibe las  │         ¿Hace listen?         │
+  │                   │    peticiones?     │                               │
+  ├───────────────────┼────────────────────┼───────────────────────────────┤
+  │ Local (server.js) │ Tu propio proceso  │ Sí — abre el puerto 3001 y    │
+  │                   │ Node               │ espera                        │
+  ├───────────────────┼────────────────────┼───────────────────────────────┤
+  │ Vercel            │ La plataforma de   │ No — exporta un handler y     │
+  │ (api/index.js)    │ Vercel             │ Vercel lo invoca por cada     │
+  │                   │                    │ request                       │
+  └───────────────────┴────────────────────┴───────────────────────────────┘
+
+  En Vercel, si hicieras listen(), la lambda abriría un puerto, no lo cerraría
+  nunca y la función nunca terminaría — se corta por timeout y no responde. Por
+  eso la app se construye una vez en app.js (las rutas) y cada entrada decide
+  cómo arrancarla:
+
+  - server.js → app.listen(3001) para desarrollar en tu máquina.
+  - api/index.js → export default serverless(app) para que Vercel la invoque.
+
+  El listen del server.js actual de Nicolás no está mal per se — lo que rompe el
+   esquema es que la definición de rutas viva en el mismo archivo que el listen,
+   porque entonces la entrada de Vercel no puede reusar la app sin arrastrar el
+  listener.
+
+✻ Baked for 9s
+
+❯ bueno hace el app.js y todos los routes y los cambios que quieras necesarios  
+  hacer en server.js. sin errores                                               
+
+  Thought for 1m 13s (ctrl+o to expand)
+
+● Perfecto. Antes de escribir, verifico dos cosas con los paquetes ya
+  instalados: que los schemas zod v4 que usé en los models funcionen (el formato
+   datetime) y cómo se importa serverless-http v4 en la entrada de Vercel.
+
+  Thought for 2s, ran 1 shell command (ctrl+o to expand)
+
+● No están instaladas las dependencias (hay package-lock.json pero falta
+  node_modules). Las instalo.
+
+  Thought for 32s, ran 2 shell commands (ctrl+o to expand)
+
+● Todo verificado: zod v4 funciona con los schemas que ya escribí y
+  serverless-http v4 tiene default export. Ahora escribo todo: primero exporto
+  los fragmentos de campos desde los models (los services los necesitan), y creo
+   utils/ y middlewares/.
+
+● Update(src/models/coro.model.js)
+  ⎿  Added 5 lines, removed 5 lines
+       3  
+       4  const DIAS_SEMANA = ['lunes', 'martes', 'miercoles', 'jueves', 
+          'viernes', 'sabado', 'domingo'];
+       5  
+       6 -const campos = {                                               
+       6 +export const coroCampos = {                                    
+       7    nombre: z.string().min(1).max(120),
+       8    sedeId: z.string().uuid(),
+       9    activo: z.boolean(),
+      10 -  // diaSemana/horario aún no están en el DDL v0.1; PUT /api/ch
+         -oirs/:id los menciona.                                         
+      10 +  // diaSemana/horario: agregados al DDL en v0.2 (PUT /api/choi
+         +rs/:id los menciona).                                          
+      11    diaSemana: z.enum(DIAS_SEMANA).nullable().optional(),
+      12    horario: z
+      13      .string()
+     ...
+      18  
+      19  export const coroSchema = z.object({
+      20    id: z.string().uuid(),
+      21 -  ...campos,                                                   
+      21 +  ...coroCampos,                                               
+      22    createdAt: z.string().datetime({ offset: true }),
+      23    updatedAt: z.string().datetime({ offset: true }),
+      24    deletedAt: z.string().datetime({ offset: true }).nullable(),
+     ...
+      27  export const coroCreateSchema = z
+      28    .object({
+      29      id: z.string().uuid().optional(),
+      30 -    ...campos,                                                 
+      30 +    ...coroCampos,                                             
+      31    })
+      32    .strict();
+      33  
+      34 -export const coroUpdateSchema = z.object({ ...campos }).partial
+         -().strict();                                                   
+      34 +export const coroUpdateSchema = z.object({ ...coroCampos }).par
+         +tial().strict();                                               
+      35  
+      36  export function coroFromDb(row) {
+      37    return {
+
+● Update(src/models/participante.model.js)
+  ⎿  Added 4 lines, removed 4 lines
+      3  
+      4  const FECHA = /^\d{4}-\d{2}-\d{2}$/;
+      5  
+      6 -const campos = {                                                
+      6 +export const participanteCampos = {                             
+      7    nombre: z.string().min(1).max(120),
+      8    apellido: z.string().min(1).max(120),
+      9    fechaNacimiento: z.string().regex(FECHA).nullable(),
+     ...
+      15  
+      16  export const participanteSchema = z.object({
+      17    id: z.string().uuid(),
+      18 -  ...campos,                                                   
+      18 +  ...participanteCampos,                                       
+      19    createdAt: z.string().datetime({ offset: true }),
+      20    updatedAt: z.string().datetime({ offset: true }),
+      21    deletedAt: z.string().datetime({ offset: true }).nullable(),
+     ...
+      24  export const participanteCreateSchema = z
+      25    .object({
+      26      id: z.string().uuid().optional(),
+      27 -    ...campos,                                                 
+      27 +    ...participanteCampos,                                     
+      28    })
+      29    .strict();
+      30  
+      31 -export const participanteUpdateSchema = z.object({ ...campos })
+         -.partial().strict();                                           
+      31 +export const participanteUpdateSchema = z.object({ ...participa
+         +nteCampos }).partial().strict();                               
+      32  
+      33  export function participanteFromDb(row) {
+      34    return {
+
+● Write(src/utils/errors.js)
+  ⎿  Wrote 19 lines to src/utils/errors.js
+       1 export class ApiError extends Error {
+       2   constructor(status, message, detalles = null) {
+       3     super(message);
+       4     this.status = status;
+       5     this.detalles = detalles;
+       6   }
+       7 }
+       8 
+       9 export function badRequest(mensaje = 'Datos inválidos') {
+      10   return new ApiError(400, mensaje);
+     … +10 lines (ctrl+o to expand)
+
+● Write(src/utils/validate.js)
+  ⎿  Wrote 26 lines to src/utils/validate.js
+       1 import { unprocessable } from './errors.js';
+       2 
+       3 function parseCon(schema, datos) {
+       4   const resultado = schema.safeParse(datos);
+       5   if (!resultado.success) {
+       6     throw unprocessable(
+       7       resultado.error.issues.map((issue) => ({
+       8         campo: issue.path.join('.'),
+       9         mensaje: issue.message,
+      10       }))
+     … +16 lines (ctrl+o to expand)
+
+● Write(src/middlewares/errorHandler.js)
+  ⎿  Wrote 28 lines to src/middlewares/errorHandler.js
+       1 import { ApiError } from '../utils/errors.js';
+       2 
+         te wrapper lo hace.
+       4 export function asyncHandler(fn) {
+       5   return (req, res, next) => Promise.resolve(fn(req, res, next))
+       6 }
+       7 
+       8 const ERRORES_PG = {
+      10   '23503': { status: 409, mensaje: 'Referencia a un registro ine
+         xistente' },
+     … +25 lines (ctrl+o to expand)
+
+  Thought for 3s (ctrl+o to expand)
+
+● Ahora los services (uno por recurso: bootstrap, choirs, students y attendances
+   — que incluye el sync con savepoints).
+
+● Write(src/services/bootstrap.service.js)
+  ⎿  Wrote 19 lines to src/services/bootstrap.service.js
+       1 import { getCorosParaUsuario, getParticipantesParaUsuario } from
+          '../repositories/bootstrap.repo.js';
+       3 // Contrato con la PWA: coros (con su sede) y estudiantes (con s
+         us coros asignados).
+       4 // usuarioId queda null hasta que exista auth (RF-03): devuelve 
+       5 export async function getBootstrap(usuarioId = null) {
+       6   const coros = await getCorosParaUsuario(usuarioId);
+       7   const filas = await getParticipantesParaUsuario(usuarioId);
+       9   const estudiantes = new Map();
+      10   for (const fila of filas) {
+     … +13 lines (ctrl+o to expand)
+
+● Write(src/services/choirs.service.js)
+  ⎿  Wrote 62 lines to src/services/choirs.service.js
+       1 import { z } from 'zod';
+       2 import { coroCampos } from '../models/coro.model.js';
+       3 import { ensureSede, insertCoro, updateCoro } from '../repositor
+       4 import { parseBody } from '../utils/validate.js';
+       5 import { badRequest, notFound } from '../utils/errors.js';
+       6 
+       7 // Mapeo coro/sede (opción A): el coro llega con su sede; ensure
+         Sede la crea si no existe.
+       9   .object({
+      10     nombre: z.string().min(1).max(120),
+     … +55 lines (ctrl+o to expand)
+
+● Write(src/services/students.service.js)
+  ⎿  Wrote 81 lines to src/services/students.service.js
+       1 import { z } from 'zod';
+       2 import { participanteCampos } from '../models/participante.model
+         .js';
+       3 import {
+       4   cerrarMembresia,
+       6   listMembresiasActivas,
+       7   updateParticipante,
+       8   upsertMembresiaActiva,
+       9 } from '../repositories/students.repo.js';
+      10 import { withTransaction } from '../config/db.js';
+     … +84 lines (ctrl+o to expand)
+
+● Write(src/services/attendances.service.js)
+  ⎿  Wrote 81 lines to src/services/attendances.service.js
+       1 import { z } from 'zod';
+       2 import { claseSchema } from '../models/clase.model.js';
+       3 import { asistenciaSchema } from '../models/asistencia.model.js'
+         ;
+       4 import { pool } from '../config/db.js';
+       6   insertSincronizacion,
+       7   listAsistencias as listAsistenciasRepo,
+       8   upsertAsistencia,
+       9   upsertClase,
+      10 } from '../repositories/attendance.repo.js';
+     … +76 lines (ctrl+o to expand)
+
+  Thought for 2s (ctrl+o to expand)
+
+● Ahora las rutas, app.js, el nuevo server.js y la entrada de Vercel.
+
+● Write(src/routes/bootstrap.routes.js)
+  ⎿  Wrote 14 lines to src/routes/bootstrap.routes.js
+       1 import { Router } from 'express';
+       2 import { asyncHandler } from '../middlewares/errorHandler.js';
+       3 import { getBootstrap } from '../services/bootstrap.service.js';
+       4 
+       5 const router = Router();
+       6 
+       7 router.get(
+       8   '/bootstrap',
+       9   asyncHandler(async (req, res) => {
+      10     res.json(await getBootstrap());
+     … +4 lines (ctrl+o to expand)
+
+● Write(src/routes/attendances.routes.js)  ⎿  Wrote 33 lines to src/routes/attendances.routes.js
+       1 import { Router } from 'express';
+       2 import { z } from 'zod';
+       3 import { asyncHandler } from '../middlewares/errorHandler.js';
+       4 import { listAttendances, processSync } from '../services/attend
+         ances.service.js';
+       6 
+       7 const router = Router();
+       8 
+       9 const querySchema = z
+      10   .object({
+     … +24 lines (ctrl+o to expand)
+
+● Write(src/routes/students.routes.js)
+  ⎿  Wrote 26 lines to src/routes/students.routes.js
+      1 import { Router } from 'express';
+      2 import { z } from 'zod';
+      3 import { asyncHandler } from '../middlewares/errorHandler.js';
+      4 import { createStudent, updateStudent } from '../services/student
+        s.service.js';
+      6 
+      7 const router = Router();
+      8 
+      9 const paramsSchema = z.object({ id: z.string().uuid() }).strict()
+        ;
+     … +17 lines (ctrl+o to expand)
+
+● Write(src/routes/choirs.routes.js)
+  ⎿  Wrote 26 lines to src/routes/choirs.routes.js
+      1 import { Router } from 'express';
+      2 import { z } from 'zod';
+      3 import { asyncHandler } from '../middlewares/errorHandler.js';
+      4 import { createChoir, updateChoir } from '../services/choirs.serv
+        ice.js';
+      6 
+      7 const router = Router();
+      8 
+      9 const paramsSchema = z.object({ id: z.string().uuid() }).strict()
+        ;
+     … +17 lines (ctrl+o to expand)
+
+● Write(src/app.js)
+  ⎿  Wrote 25 lines to src/app.js
+       1 import express from 'express';
+       2 import cors from 'cors';
+       3 import { errorHandler } from './middlewares/errorHandler.js';
+       4 import bootstrapRoutes from './routes/bootstrap.routes.js';
+       5 import attendancesRoutes from './routes/attendances.routes.js';
+       6 import studentsRoutes from './routes/students.routes.js';
+       7 import choirsRoutes from './routes/choirs.routes.js';
+       8 
+       9 export function createApp() {
+      10   const app = express();
+     … +18 lines (ctrl+o to expand)
+
+● Write(src/server.js)
+  ⎿  Added 3 lines, removed 27 lines
+       1 -import express from 'express';                                 
+       2 -import cors from 'cors';                                       
+       3 -import dotenv from 'dotenv';                                   
+       1 +import { createApp } from './app.js';                          
+       2  
+       5 -dotenv.config();                                               
+       6 -                                                               
+       7 -const app = express();                                         
+       3  const PORT = process.env.PORT || 3001;
+       4  
+      10 -// Middlewares                                                 
+      11 -app.use(cors()); // Permite peticiones desde el frontend (Vite)
+      12 -app.use(express.json()); // Permite recibir cuerpos JSON en POS
+         -T y PUT                                                        
+      13 -                                                               
+      14 -// Endpoint de prueba inicial                                  
+      15 -app.get('/api/health', (req, res) => {                         
+      16 -  res.status(200).json({ status: 'ok', message: 'Servidor Canta
+         -r Presente en línea' });                                       
+      17 -});                                                            
+      18 -                                                               
+      19 -// 1. GET /api/bootstrap                                       
+      20 -// Devuelve los datos iniciales necesarios para hidratar la PWA
+      21 -app.get('/api/bootstrap', (req, res) => {                      
+      22 -  res.status(200).json({                                       
+      23 -    choirs: [],                                                
+      24 -    students: [],                                              
+      25 -    attendances: []                                            
+      26 -  });                                                          
+      27 -});                                                            
+      28 -                                                               
+      29 -app.listen(PORT, () => {                                       
+       5 +createApp().listen(PORT, () => {                               
+       6    console.log(`Servidor corriendo en http://localhost:${PORT}`)
+          ;
+      31 -});                                                            
+       7   No newline at end of file
+       8 +});                                                            
+
+● Write(api/index.js)
+  ⎿  Wrote 4 lines to api/index.js
+      1 import serverless from 'serverless-http';
+      2 import { createApp } from '../src/app.js';
+      3 
+      4 export default serverless(createApp());
+
+  Thought for 7s (ctrl+o to expand)
+
+● Todo escrito. Ahora la verificación "sin errores": importo la app, levanto el
+  servidor y pruebo los endpoints (los que no necesitan BD: validaciones, health
+   y el manejo de error sin conexión).
+
+  Ran 1 shell command (ctrl+o to expand)
+
+❯ YA ESTA TODO LISTO PARA ARRANCAR EL BACK!?                                    
+
+  Thought for 7s (ctrl+o to expand)
+
+● Casi. Todo el código del backend está escrito — pero "arrancar" requiere un
+  par de pasos de infraestructura que todavía no se hicieron:
+
+  ✅ Escrito y listo:
+  - Capa completa: models/ → repositories/ → services/ → routes/ → app.js
+  - server.js (solo listen) + api/index.js (entrada Vercel)
+  - Migraciones (esquema + índices/vistas + runner) y config/db.js
+  - Dependencias instaladas (npm install ya corrió)
+
+  ❌ Falta para arrancar de verdad:
+
+  1. La base de datos no existe todavía. Hay que crear el proyecto en Supabase
+  (DEV), copiar la URL de conexión a un .env en BACK/ y correr npm run migrate.
+  Sin esto, cualquier endpoint real responde 500 (solo /api/health funciona sin
+  BD).
+  2. Seeds: no hay datos iniciales — y roles es obligatorio porque
+  usuarios.rol_id tiene FK (sin roles no se puede insertar ningún usuario). Es
+  el próximo archivo natural: db/seeds/001_roles_sedes_coros.sql.
+  3. Verificación pendiente: no llegué a probar que el servidor levante sin
+  errores de import (justo me rechazaste el comando de prueba). Lo importante:
+  el código está sin probar, y "sin errores" no puedo garantizarlo hasta
+  correrlo una vez.
+  4. Auth sigue pendiente (RF-01..03): no hay endpoint de login, así que
+  bootstrap devuelve todo el padrón sin filtrar por usuario.
+
+  Entonces: el código está completo al 100% de la estructura acordada, pero para
+   arrancarlo necesitás la URL de Supabase (o decirme si tenés credenciales) y
+  correr migraciones + seeds.
+
+  ¿Querés que haga el seed de roles/sedes/coros y dejemos todo listo para que
+  solo falte pegar la URL de Supabase en el .env?
+
+✻ Baked for 10s
+
+❯ puedo arrancar el back (solo para probar si corre) sin la conexion a bd?      
+
+  Thought for 5s (ctrl+o to expand)
+
+● Sí, perfectamente. El pool de pg es lazy: no intenta conectar hasta que llega
+  la primera consulta, así que el servidor levanta igual.
+
+  Para probar:
+
+  cd BACK
+  npm run dev
+
+  Y en otra terminal:
+
+  curl http://localhost:3001/api/health
+
+  Lo que vas a ver:
+
+  ┌──────────────────────────┬──────────────────────────────────────────────┐
+  │         Endpoint         │                    Sin BD                    │
+  ├──────────────────────────┼──────────────────────────────────────────────┤
+  │ GET /api/health          │ ✅ 200 {"status":"ok",...} — no toca la BD   │
+  ├──────────────────────────┼──────────────────────────────────────────────┤
+  │                          │ ⚠️ 500 {"error":"Error interno del           │
+  │ GET /api/bootstrap y     │ servidor"} — el errorHandler captura el      │
+  │ demás                    │ fallo de conexión y responde JSON, no        │
+  │                          │ crashea                                      │
+  ├──────────────────────────┼──────────────────────────────────────────────┤
+  │ Validaciones (ej. POST   │ ✅ 422 con detalles — la validación zod      │
+  │ /api/students con body   │ corre antes de tocar la BD                   │
+  │ inválido)                │                                              │
+  └──────────────────────────┴──────────────────────────────────────────────┘
+
+  O sea: sin BD podés verificar que arranca, que las rutas están montadas y que
+  las validaciones responden. Lo único que no podés probar sin BD es el flujo
+  real de datos.
+
+  Cuando quieras, te ayudo con el .env + Supabase + migraciones y ahí probamos
+  el bootstrap real.
+
+✻ Cooked for 7s
+
+❯ como arranco                                                                  
+
+  Thought for 5s (ctrl+o to expand)
+
+● En una terminal:
+
+  cd /home/tadeo/Proyectos/Facultad-2026B/DireccionDeProyectos/Prototipo-CantarP
+  resente/BACK
+  npm run dev
+
+  Deberías ver:
+
+  Servidor corriendo en http://localhost:3001
+
+  Y para probarlo (en otra terminal o en el navegador):
+
+  - Navegador: http://localhost:3001/api/health → te devuelve
+  {"status":"ok",...}
+  - O terminal: curl http://localhost:3001/api/health
+
+  Con npm run dev el servidor se reinicia solo cuando cambiás un archivo (es
+  node --watch). Para frenarlo: Ctrl+C.
+
+  Si preferís correrlo desde acá (esta sesión), escribí en el prompt:
+
+  ! cd BACK && npm run dev
+
+  pero ojo que te bloquea la sesión mientras corre — para probar rápido conviene
+   tu propia terminal.
+
+✻ Sautéed for 7s
+
+❯ que puedo verificar para ver la integridad de la app antes de hacer una       
+  conexion concreta con la bd?                                                  
+
+  Thought for 17s (ctrl+o to expand)
+
+● Buena pregunta — hay bastante que se puede verificar sin BD, porque la
+  validación (zod) corre antes de tocar la BD y el pool de pg falla de forma
+  controlada. Acá va el checklist:
+
+  A. Arranque y manejo de errores
+
+  # 1. Arranque limpio: sin errores de import en consola
+  npm run dev
+
+  # 2. Health: esperado 200 JSON
+  curl -i http://localhost:3001/api/health
+
+  # 3. Endpoint que toca BD sin conexión: esperado 500 {"error":"Error interno 
+  del servidor"}
+  curl -i http://localhost:3001/api/bootstrap
+
+  # 4. CLAVE: repetir el 3 — si sigue respondiendo, el errorHandler y el pool 
+  quedaron sanos
+  #    (si el server se hubiera caído, esto fallaría con "connection refused")
+  curl -i http://localhost:3001/api/bootstrap
+
+  # 5. CORS (importa para el front): esperado header 
+  Access-Control-Allow-Origin: *
+  curl -i -H "Origin: http://localhost:5173" http://localhost:3001/api/health
+
+  B. Validación de entrada (todo responde 422/400 sin tocar la BD)
+
+  # 6. Body vacío: esperado 422 con "detalles" campo por campo
+  curl -i -X POST http://localhost:3001/api/students -H "Content-Type: 
+  application/json" -d '{}'
+
+  # 7. JSON malformado: esperado 400
+  curl -i -X POST http://localhost:3001/api/students -H "Content-Type: 
+  application/json" -d '{roto'
+
+  # 8. UUID inválido en path: esperado 422
+  curl -i -X PUT http://localhost:3001/api/students/abc -H "Content-Type: 
+  application/json" -d '{"nombre":"X"}'
+
+  # 9. Sync con datos inválidos (estado inexistente, fecha mal formada): 
+  esperado 422 con detalles
+  curl -i -X POST http://localhost:3001/api/attendances/sync -H "Content-Type: 
+  application/json" -d '{"dispositivoId":"d1","lotes":[{"clase":{"id":"no-uuid",
+  "coroId":"x","fecha":"10/09/2026","hora":null,"usuarioId":null,"observaciones"
+  :null,"createdAt":"2026-10-09T12:00:00.000Z","updatedAt":"2026-10-09T12:00:00.
+  000Z","deletedAt":null},"asistencias":[{"claseId":"x","participanteId":"y","es
+  tado":"tarde","registradoPor":null,"createdAt":"2026-10-09T12:00:00.000Z","upd
+  atedAt":"2026-10-09T12:00:00.000Z"}]}]}'
+
+  # 10. Query inválida: esperado 422
+  curl -i "http://localhost:3001/api/attendances?coroId=abc"
+
+  C. Contratos de datos (schemas zod, sin BD)
+
+  Esto valida el contrato que la PWA va a mandar en el sync — lo más importante
+  para tu lado:
+
+  node -e "
+  Promise.all([
+    import('./src/models/clase.model.js'),
+    import('./src/models/asistencia.model.js'),
+  ]).then(([{claseSchema},{asistenciaSchema}]) => {
+    const loteRealista = {
+      clase: { id: crypto.randomUUID(), coroId: crypto.randomUUID(), fecha: 
+  '2026-10-09', hora: '18:30', usuarioId: null, observaciones: null, createdAt: 
+  new Date().toISOString(), updatedAt: new Date().toISOString(), deletedAt: null
+   },
+      asistencias: [
+        { claseId: crypto.randomUUID(), participanteId: crypto.randomUUID(), 
+  estado: 'presente', registradoPor: null, createdAt: new Date().toISOString(), 
+  updatedAt: new Date().toISOString() },
+        { claseId: crypto.randomUUID(), participanteId: crypto.randomUUID(), 
+  estado: 'justificado', registradoPor: null, createdAt: new 
+  Date().toISOString(), updatedAt: new Date().toISOString() },
+      ],
+    };
+    console.log('clase válida:', 
+  claseSchema.safeParse(loteRealista.clase).success);
+    console.log('asistencias válidas:', loteRealista.asistencias.every(a => 
+  asistenciaSchema.safeParse(a).success));
+    console.log('estado inválido rechazado:', 
+  !asistenciaSchema.safeParse({...loteRealista.asistencias[0], estado: 
+  'tarde'}).success);
+    console.log('hora sin minutos rechazada:', 
+  !claseSchema.safeParse({...loteRealista.clase, hora: '18'}).success);
+  }).catch(e => { console.error('FALLO:', e.message); process.exit(1); });
+  "
+
+  Qué NO podés verificar sin BD (no te frustres si falla)
+
+  - Flujo real de datos: bootstrap con datos, upserts idempotentes, savepoints
+  del sync, FKs (23503/23505/23514), vistas de indicadores.
+  - La sintaxis de las migraciones: PostgreSQL la valida recién al correrlas
+  (npm run migrate).
+
+  Si todo lo de A, B y C pasa, la integridad de la app está bien: la estructura,
+   las capas, las validaciones y el manejo de errores. Lo único pendiente sería
+  la BD.
+
+  Si querés, te lo corro yo todo de una y te pego los resultados.
+
+✻ Sautéed for 25s
+
+※ recap: Estamos armando el backend de Cantar Presente: código completo (models, repos, services, rutas, migraciones) con dependencias instaladas, pero aún sin base de datos conectada. El próximo paso es crear la BD en Supabase, configurar el .env y correr npm run migrate. (disable recaps in /config)
+
+❯ tengo creada una BD en supabase. vacia. como la conecto con el big backend?   
+
+  Thought for 12s (ctrl+o to expand)
+
+● Dale, es un proceso de 3 pasos. Antes de explicarte, verifico que el
+  .gitignore cubra el .env para no terminar subiendo credenciales al repo.
+
+  Searched for 1 pattern (ctrl+o to expand)
+  ⎿  Interrupted · What should Claude do instead?
+
+❯ cubre el .env. ahora que                                                      
+
+  Thought for 11s, read 1 file (ctrl+o to expand)
+
+● Ya está cubierto — veo que el .gitignore ahora tiene *.env (línea 10), que
+  matchea .env sin problema. No hay que tocar nada.
+
+  Ahora sí, los pasos para conectar la BD:
+
+  1. Copiar la connection string de Supabase
+
+  En el dashboard: tu proyecto → botón "Connect" (Conectar) → pestaña 
+  "Connection string" → copiá la URI directa (la de db.<ref>.supabase.co:5432) y
+   también la Transaction pooler (la de pooler.supabase.com:6543).
+
+  ▎ Si tu password tiene caracteres especiales (@, :, /), copialas tal cual las 
+  ▎ da el panel — ya vienen codificadas.
+
+  2. Crear BACK/.env
+
+  DATABASE_URL=postgresql://postgres.tu-ref:TU_PASSWORD@db.tu-ref.supabase.co:54
+  32/postgres
+  DATABASE_URL_POOLED=postgresql://postgres.tu-ref:TU_PASSWORD@aws-0-tu-region.p
+  ooler.supabase.com:6543/postgres
+
+  - DATABASE_URL (directa) → la usa local y las migraciones.
+  - DATABASE_URL_POOLED → solo la usa Vercel (cuando VERCEL esté definida como
+  env var).
+
+  3. Correr las migraciones
+
+  cd BACK
+  npm run migrate
+
+  Esperado:
+
+  ✓ 001_esquema.sql
+  ✓ 002_indices_vistas.sql
+
+  4. Verificar
+
+  - En Supabase: Table Editor → deberías ver las 11 tablas + schema_migrations.
+  Las vistas (v_...) aparecen en la sección Views del schema.
+  - En la app (con npm run dev):
+
+  curl http://localhost:3001/api/bootstrap
+
+  Esperado: 200 {"coros":[],"students":[]} — vacío pero real: ya no es el 500,
+  es la BD respondiendo.
+
+  Cuando lo tengas corriendo, avisame y seguimos con los seeds (roles +
+  sedes/coros iniciales de Sembrar Cantando) y la prueba end-to-end: crear coro
+  → crear participante → sync de asistencia → consultar historial.
+
+✻ Baked for 15s
+❯ creame un .envexample para mi con todo placeholder                            
+
+  Thought for 3s (ctrl+o to expand)
+
+● Write(.env.example)
+  ⎿  Wrote 14 lines to .env.example
+       1 # Copiar este archivo a .env y completar con los datos del proye
+         cto Supabase.
+       3 
+       4 # Conexión directa (local y migraciones)
+       5 DATABASE_URL=postgresql://postgres.TU_PROJECT_REF:TU_PASSWORD@db
+       6 
+       7 # Pooler en modo transacción (usado por Vercel, puerto 6543)
+       8 DATABASE_URL_POOLED=postgresql://postgres.TU_PROJECT_REF:TU_PASS
+       9 
+      10 # Puerto local (opcional, default 3001)
+     … +8 lines (ctrl+o to expand)
+
+  Thought for 2s (ctrl+o to expand)
+
+● Listo, creé BACK/.env.example con placeholders para DATABASE_URL,
+  DATABASE_URL_POOLED, PORT y la nota de VERCEL.
+
+  Para usarlo: cp .env.example .env y completás TU_PROJECT_REF, TU_PASSWORD y
+  TU_REGION con los datos de Supabase. Después npm run migrate y listo.
+
+✻ Cogitated for 7s
+
+❯ que es URL pooled?                                                            
+
+  Thought for 4s (ctrl+o to expand)
+
+● La URL pooled es la misma base PostgreSQL de Supabase, pero accedida a través
+  de Supavisor, el pooler de conexiones de Supabase (puerto 6543, modo
+  transacción). La diferencia con la directa está en cómo llegan tus consultas:
+
+  Sin pooler (directa, :5432):   tu app ──► 1 conexión TCP ──► PostgreSQL
+  Con pooler (pooled, :6543):    tu app ──► Supavisor ──► pocas conexiones
+  compartidas ──► PostgreSQL
+
+  El problema que resuelve: el plan gratuito de Supabase limita las conexiones
+  directas (algunas decenas). Localmente no importa — tu npm run dev abre 10
+  como máximo. Pero en Vercel hay un detalle: cada lambda serverless mantiene su
+   propio pool con conexiones abiertas. Si Vercel levanta 20 lambdas frías, son
+  20+ conexiones directas ocupando el límite sin hacer nada.
+
+  Cómo funciona Supavisor en modo transacción: muchos clientes comparten un
+  puñado de conexiones reales. Cada transacción "toma prestada" una conexión
+  mientras dura y la devuelve al terminar. Por eso en db.js configuré el pool de
+   serverless con max: 2 — las lambdas se conectan al pooler, no directo a
+  PostgreSQL.
+
+  Costos del modo transacción (cosas que no andan por el pooler):
+  - Prepared statements con nombre
+  - LISTEN/NOTIFY y advisory locks (features de sesión)
+
+  Nuestro sync no usa nada de eso — transacciones simples con upserts — así que
+  es compatible. Por eso las dos URLs: DATABASE_URL (directa, para local y
+  migraciones) y DATABASE_URL_POOLED (pooler, para producción en Vercel).
+
+✻ Worked for 8s
+
+❯ si solo tengo que usar 1 cual uso                                             
+
+  Thought for 3s (ctrl+o to expand)
+
+● DATABASE_URL (la directa).
+
+  Es la que usa la app en local (cuando VERCEL no está definida, db.js toma esa)
+   y la que usa npm run migrate. La pooled solo la vas a necesitar cuando
+  despliegues en Vercel — y ahí ni siquiera va en tu .env, va como variable de
+  entorno del proyecto en Vercel.
+
+  Así que ahora: completá solo DATABASE_URL en tu .env, corré npm run migrate y
+  listo. La pooled la dejás anotada para el día del deploy.
+
+✻ Crunched for 4s
+
+❯ mi link de la BD supabase es:                                                 
+  https://supabase.com/dashboard/project/ejcjzsmavhknarddsckl, y la contraseña  
+  es cantarPresente68. modifica el .env.example con esta info                   
+
+  Thought for 8s (ctrl+o to expand)
+
+● Ojo con un detalle de seguridad: .env.example sí se commitea al repo (el *.env
+   del gitignore no lo cubre porque termina en .example). Si pongo la contraseña
+   ahí, queda en GitHub. Lo correcto es crear el .env real (que sí está
+  ignorado) con tus datos y dejar el .env.example como plantilla. Hago eso —
+  primero averiguo la región de tu proyecto para la URL pooled.
+
+  Thought for 6s, ran 2 shell commands (ctrl+o to expand)
+
+● No pude resolver la región por DNS, así que la URL directa va completa y la
+  pooled (que solo se usa en Vercel) queda con la región como placeholder para
+  copiarla del dashboard cuando haga falta.
+
+● Write(.env)
+  ⎿  Wrote 9 lines to .env
+      1 # Conexión directa (local y migraciones)
+      2 DATABASE_URL=postgresql://postgres.ejcjzsmavhknarddsckl:cantarPre
+        sente68@db.ejcjzsmavhknarddsckl.supabase.co:5432/postgres
+      4 # Pooler en modo transacción (solo Vercel) — completar la región 
+        desde
+      5 # Supabase → Connect → Connection string → Transaction pooler
+      6 DATABASE_URL_POOLED=postgresql://postgres.ejcjzsmavhknarddsckl:ca
+        ntarPresente68@aws-0-TU_REGION.pooler.supabase.com:6543/postgres
+      8 # Puerto local (opcional, default 3001)
+      9 PORT=3001
+     … +2 lines (ctrl+o to expand)
+
+  Thought for 3s, ran 1 shell command (ctrl+o to expand)
+
+❯ que significa la URL? cual es la sintaxis para que generaste eso.             
+
+  Thought for 5s (ctrl+o to expand)
+
+● La URL es una forma compacta de darle a pg los 5 datos de conexión. Sintaxis
+  general:
+
+  postgresql://USUARIO:CONTRASEÑA@HOST:PUERTO/BASE_DE_DATOS
+
+  Desglosando la tuya:
+
+  postgresql://postgres.ejcjzsmavhknarddsckl:cantarPresente68@db.ejcjzsmavhknard
+  dsckl.supabase.co:5432/postgres
+               └─────┬────────────┘ └───────┬───────┘
+  └────────────┬────────────────────────┘ └──┘ └─────┘
+                  USUARIO             CONTRASEÑA                  HOST
+            PUERTO  BASE
+
+  ┌──────────────┬───────────────────────────────────┬─────────────────────┐
+  │    Parte     │               Valor               │    De dónde sale    │
+  ├──────────────┼───────────────────────────────────┼─────────────────────┤
+  │              │                                   │ fijo, le dice a pg  │
+  │ postgresql:/ │ protocolo                         │ que hable el        │
+  │ /            │                                   │ protocolo de        │
+  │              │                                   │ PostgreSQL          │
+  ├──────────────┼───────────────────────────────────┼─────────────────────┤
+  │              │                                   │ Supabase arma el    │
+  │ Usuario      │ postgres.ejcjzsmavhknarddsckl     │ rol como postgres + │
+  │              │                                   │  tu project ref     │
+  ├──────────────┼───────────────────────────────────┼─────────────────────┤
+  │ Contraseña   │ cantarPresente68                  │ la que setearon al  │
+  │              │                                   │ crear el proyecto   │
+  ├──────────────┼───────────────────────────────────┼─────────────────────┤
+  │              │                                   │ patrón de Supabase: │
+  │ Host         │ db.ejcjzsmavhknarddsckl.supabase. │  db.<ref>.supabase. │
+  │              │ co                                │ co para conexión    │
+  │              │                                   │ directa             │
+  ├──────────────┼───────────────────────────────────┼─────────────────────┤
+  │ Puerto       │ 5432                              │ puerto estándar de  │
+  │              │                                   │ PostgreSQL          │
+  ├──────────────┼───────────────────────────────────┼─────────────────────┤
+  │              │                                   │ nombre de la BD por │
+  │ Base         │ postgres                          │  defecto que        │
+  │              │                                   │ Supabase te crea    │
+  └──────────────┴───────────────────────────────────┴─────────────────────┘
+
+  Y el project ref (ejcjzsmavhknarddsckl) es justamente el id que aparece en tu
+  link del dashboard: supabase.com/dashboard/project/ejcjzsmavhknarddsckl. Con
+  eso + la contraseña se arma toda la URL.
+
+  La pooled sigue la misma sintaxis, cambian host y puerto:
+
+  postgresql://postgres.ejcjzsmavhknarddsckl:cantarPresente68@aws-0-<region>.poo
+  ler.supabase.com:6543/postgres
+
+  Es lo mismo que si en pg pasaras los datos por separado (host, user, password,
+   port, database) — la URL es solo la forma de tenerlo todo en una línea.
+
+  ▎ Nota: si una contraseña tuviera caracteres especiales (@, :, /), habría que 
+  ▎ "escaparlos" (URL-encoding). La tuya es simple, por eso va tal cual.
+
+✻ Sautéed for 9s
+
+❯ cual es el usuario, cual es la contraseña, cual es el host, cual es el        
+  puerto, cual es el base de esa URL!!!!!!!!!!!!!!!!!!?                         
+
+  Thought for 4s (ctrl+o to expand)
+
+● De tu URL postgresql://postgres.ejcjzsmavhknarddsckl:cantarPresente68@db.ejcjz
+  smavhknarddsckl.supabase.co:5432/postgres:
+
+  - Usuario: postgres.ejcjzsmavhknarddsckl
+  - Contraseña: cantarPresente68
+  - Host: db.ejcjzsmavhknarddsckl.supabase.co
+  - Puerto: 5432
+  - Base: postgres
+
+✻ Cooked for 4s
+
+❯ eso esta mal. postgres.ejcjz* es la id del proyecto. no mi usuario.           
+
+  Thought for 6s (ctrl+o to expand)
+
+● Tenés razón en la mitad: ejcjzsmavhknarddsckl solo es el ID del proyecto. Pero
+   en Supabase el rol de PostgreSQL se llama postgres.<id-del-proyecto> — es
+  decir, el ID va dentro del nombre de usuario. Las dos cosas son ciertas:
+
+  - ID del proyecto: ejcjzsmavhknarddsckl
+  - Usuario (rol) para conectarte: postgres.ejcjzsmavhknarddsckl
+
+  No es un dato que yo inventé: es la convención de Supabase. El panel te lo
+  muestra así en Connect → Connection string:
+
+  postgresql://postgres.ejcjzsmavhknarddsckl:[YOUR-PASSWORD]@db.ejcjzsmavhknardd
+  sckl.supabase.co:5432/postgres
+
+  Si querés comprobarlo vos mismo sin dudas:
+
+  1. Abrí el SQL Editor de Supabase (en tu proyecto).
+  2. Corré: SELECT current_user;
+  3. Te va a devolver postgres.ejcjzsmavhknarddsckl.
+
+  Y la prueba definitiva: npm run migrate con el .env que te armé — si la URL
+  estuviera mal, la conexión fallaría al instante.
+
+  Igual, si en tu dashboard la connection string aparece distinta (por ejemplo
+  con otro usuario que hayan creado), pegame la URL tal cual te la muestra y
+  actualizo el .env con eso.
+
+✻ Cooked for 8s
+
+❯ bueno y ahora                                                                 
+
+  Thought for 5s (ctrl+o to expand)
+
+● Ahora sí, lo bueno — correr las migraciones y ver la BD poblarse:
+
+  1. Migraciones:
+
+  cd BACK
+  npm run migrate
+
+  Esperado:
+
+  ✓ 001_esquema.sql
+  ✓ 002_indices_vistas.sql
+
+  2. Verificar en Supabase: Table Editor → deberías ver las 11 tablas +
+  schema_migrations.
+
+  3. Probar la app contra la BD real:
+
+  npm run dev
+
+  curl http://localhost:3001/api/bootstrap
+
+  Esperado: 200 {"coros":[],"students":[]} — vacío, pero es tu BD respondiendo.
+
+  Si el migrate falla (SSL, credenciales, etc.), pegame el error y lo
+  resolvemos. Si querés, también te lo corro yo desde acá — decime.
+
+✻ Sautéed for 6s
+
+❯ que parte del codigo recurre al .env?                                         
+  Thought for 6s (ctrl+o to expand)
+
+● Son dos puntos de carga y cuatro variables. El mapa completo:
+
+  Quién carga el .env
+
+  import 'dotenv/config';   // ← esto lee BACK/.env y lo mete en process.env
+
+  Está en dos archivos:
+
+  1. src/config/db.js (línea 1) — y como los repos importan db.js, y los
+  services importan repos, y las rutas importan services... toda la app lo carga
+   en cadena, sin importar desde dónde arranques (server.js o api/index.js).
+  2. db/migrations/migrate.js (línea 1) — lo necesita aparte porque no importa
+  db.js (usa su propio Client, no el pool).
+
+  Qué variables se usan y dónde
+
+  ┌─────────────────────┬──────────────┬─────────────────────────────────────┐
+  │      Variable       │ Dónde se lee │              Para qué               │
+  ├─────────────────────┼──────────────┼─────────────────────────────────────┤
+  │ DATABASE_URL        │ config/db.js │ Conexión en local (cuando no hay    │
+  │                     │              │ VERCEL)                             │
+  ├─────────────────────┼──────────────┼─────────────────────────────────────┤
+  │ DATABASE_URL        │ migrate.js   │ Conexión para correr las            │
+  │                     │              │ migraciones                         │
+  ├─────────────────────┼──────────────┼─────────────────────────────────────┤
+  │ DATABASE_URL_POOLED │ config/db.js │ Conexión en Vercel (solo si VERCEL  │
+  │                     │              │ está definida)                      │
+  ├─────────────────────┼──────────────┼─────────────────────────────────────┤
+  │ VERCEL              │ config/db.js │ Switch: Boolean(process.env.VERCEL) │
+  │                     │              │  decide cuál URL usar               │
+  ├─────────────────────┼──────────────┼─────────────────────────────────────┤
+  │ PORT                │ server.js    │ Puerto local (default 3001)         │
+  └─────────────────────┴──────────────┴─────────────────────────────────────┘
+
+  Dos detalles importantes
+
+  1. Orden de carga en ESM: los import se evalúan antes que el cuerpo del
+  módulo. Cuando server.js lee process.env.PORT, db.js (con su dotenv/config) ya
+   corrió por la cadena de imports. No hay carrera: siempre funciona.
+  2. dotenv lee el .env del directorio actual (process.cwd()). Por eso las
+  migraciones se corren con npm run migrate desde BACK/ — npm siempre ejecuta
+  los scripts con el cwd en la carpeta del package.json, así que no importa
+  desde dónde lo invoques.
+
+  En resumen: si config/db.js tiene DATABASE_URL definida, toda la app la ve.
+
+✻ Sautéed for 9s
+
+❯ ya deberia funcionar con todos estos cambios. signo de pregunta               
+
+  Thought for 6s (ctrl+o to expand)
+
+● Sí — con el código completo y el .env cargado, solo faltan dos comandos para
+  confirmarlo:
+
+  cd BACK && npm run migrate     # crea las tablas en tu Supabase
+  npm run dev                    # levanta el server en :3001
+
+  Y la prueba: curl http://localhost:3001/api/bootstrap → si responde 200 
+  {"coros":[],"students":[]}, está todo funcionando.
+
+  ¿Querés que lo corra yo desde acá y te muestro el resultado? El migrate crea
+  las tablas en tu BD de Supabase (es lo que veníamos buscando), y después
+  levanto el server y pruebo los endpoints. Si preferís hacerlo vos, corré esos
+  comandos y pegame cualquier error que salga.
+
+✻ Cogitated for 7s
+
+❯ que es este error: Error: connect ENETUNREACH                                 
+  2600:1f1e:90b:a700:536f:6229:eb42:2e48:5432 - Local (:::0)                    
+      at internalConnect (node:net:1169:16)                                     
+      at defaultTriggerAsyncIdScope (node:internal/async_hooks:472:18)          
+      at GetAddrInfoReqWrap.emitLookup [as callback] (node:net:1582:9)          
+      at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:134:8) {      
+    errno: -101,                                                                
+    code: 'ENETUNREACH',                                                        
+    syscall: 'connect',                                                         
+    address: '2600:1f1e:90b:a700:536f:6229:eb42:2e48',                          
+    port: 5432                                                                  
+  }                                                                             
+
+  Thought for 17s (ctrl+o to expand)
+
+● Ese error es un problema de red, no de código: tu máquina resolvió el host
+  directo de Supabase a una dirección IPv6 (2600:1f1e:... — la misma que vimos
+  en el nslookup de antes) y tu red no tiene ruta IPv6, por eso ENETUNREACH (red
+   inalcanzable). Es un caso clásico con ISPs argentinos: la conexión directa de
+   Supabase resuelve a IPv6, y si tu conexión es solo IPv4, no llega.
+
+  La solución es usar el pooler de Supabase, que sí tiene direcciones IPv4.
+  Déjame verificar la región de tu proyecto para armarte la URL correcta.
+
+  Ran 1 shell command (ctrl+o to expand)
+
+❯ como chequear ruta ipv6 del pc linux                                          
+
+  Thought for 8s (ctrl+o to expand)
+
+● Acá tenés el checklist de diagnóstico (todo en tu terminal):
+
+  # 1. ¿Tenés dirección IPv6 en alguna interfaz?
+  ip -6 addr show
+
+  - Si solo ves ::1 (loopback) → tu equipo no tiene IPv6 global.
+  - Si aparece inet6 2xxx:... o 2800:... en wlan/eth → tenés IPv6 asignada.
+
+  # 2. ¿Hay rutas IPv6?
+  ip -6 route show
+
+  - Vacío o solo ::1 dev lo → no hay salida IPv6 a internet.
+  - Si hay una línea con default via ... → hay ruta.
+
+  # 3. Prueba de conectividad real
+  ping -6 -c 3 google.com
+
+  - connect: Network is unreachable → confirmado: sin IPv6.
+  - Si responde → tenés IPv6 y el problema es otro.
+
+  # 4. Qué resuelve DNS para el host de Supabase (clave para el fix)
+  getent ahosts db.ejcjzsmavhknarddsckl.supabase.co
+
+  - Si solo devuelve 2600:... (IPv6) → el host directo de Supabase no tiene
+  registro IPv4, y tu única salida es el pooler.
+  - Si devuelve también 54.x.x.x (IPv4) → podríamos forzar IPv4 con el flag de
+  Node.
+
+  La interpretación: si 1, 2 y 3 dicen que no tenés IPv6, el error ENETUNREACH
+  está explicado — tu red es IPv4-only y Supabase directo resuelve a IPv6. La
+  solución (que te comenté) es usar la URL del pooler, que tiene IPv4.
+
+  Corré esos cuatro comandos y pegame la salida — con eso te digo si conviene
+  cambiar la URL al pooler o forzar IPv4 en Node.
+
+✻ Cogitated for 11s
+
+❯ puedo cambiar supabase a que use ipv4                                         
+
+  Thought for 23s (ctrl+o to expand)
+
+● No — no hay ningún toggle para eso. La conexión directa de Supabase
+  (db.<ref>.supabase.co) es IPv6-only por diseño de Supabase, y no se puede
+  cambiar desde el dashboard. No es una configuración tuya.
+
+  Pero no hace falta: Supabase tiene la salida oficial para redes IPv4, que es
+  el pooler (Supavisor). Ahora, acá viene una corrección importante de algo que
+  te dije antes:
+
+  ⚠️ El pooler de transacción (puerto 6543) no sirve para nuestro código. No
+  soporta BEGIN/COMMIT/SAVEPOINT explícitos — y nuestro backend los usa en dos
+  lugares críticos:
+  - sync.service.js — sync con savepoints (un lote fallido no arruina el resto)
+  - migrate.js — cada migración corre en su transacción
+
+  Antes te dije que nuestras transacciones funcionaban en modo transacción —
+  estaba equivocado. El pooler correcto para nosotros es el de sesión (Session
+  pooler), que:
+
+  - Responde por IPv4 (resuelve tu problema)
+  - Soporta transacciones, savepoints y prepared statements (todo lo que usamos)
+  - Puerto 5432, host aws-0-<region>.pooler.supabase.com
+
+  La acción: en tu dashboard → Connect → Connection string → Session pooler →
+  copiá esa URL (ya trae tu región) y reemplazá con ella el DATABASE_URL de tu
+  .env. El DATABASE_URL_POOLED para Vercel también debería ser el de sesión
+  (5432), no el de transacción.
+
+  Si me pegás la URL que te da el dashboard, te actualizo el .env y probamos de
+  nuevo el migrate.
+
+✻ Worked for 26s
+
+※ recap: Estamos armando el backend de Cantar Presente (Express + Supabase) y quedó en conectar la BD: el host directo es IPv6-only y tu red no tiene IPv6. Próximo paso: pegar la URL "Session pooler" del dashboard en el .env y correr npm run migrate. (disable recaps in /config)
