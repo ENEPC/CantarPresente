@@ -1,15 +1,21 @@
-export default function Navbar({ currentTab, setCurrentTab }) {
+// Ids fijados por el seed del backend (db/seeds/001_roles.sql).
+const ROL_ADMIN = 2;
+
+export default function Navbar({ currentTab, setCurrentTab, usuario }) {
   const tabs = [
     { id: 'attendance', label: 'Asistencia', icon: '📋' },
     { id: 'students', label: 'Alumnos', icon: '👥' },
-    { id: 'choirs', label: 'Coros/Sedes', icon: '🏛️' },
+    { id: 'choirs', label: 'Coros/Sedes', icon: '🏛️', adminOnly: true },
     { id: 'history', label: 'Historial', icon: '📜' },
+    { id: 'voluntarios', label: 'Voluntarios', icon: '🙋', adminOnly: true },
   ];
+
+  const visibles = tabs.filter((tab) => !tab.adminOnly || usuario?.rolId === ROL_ADMIN);
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-slate-200 shadow-lg">
-      <div className="max-w-md mx-auto grid grid-cols-4 px-1 py-1">
-        {tabs.map((tab) => {
+      <div className={`max-w-md mx-auto grid px-1 py-1 ${visibles.length === 3 ? 'grid-cols-3' : 'grid-cols-5'}`}>
+        {visibles.map((tab) => {
           const isActive = currentTab === tab.id;
           return (
             <button

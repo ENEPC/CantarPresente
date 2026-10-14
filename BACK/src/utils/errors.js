@@ -17,3 +17,11 @@ export function notFound(mensaje = 'Recurso no encontrado') {
 export function unprocessable(detalles, mensaje = 'Validación fallida') {
   return new ApiError(422, mensaje, detalles);
 }
+
+export function unauthorized(mensaje = 'No autenticado') {
+  return new ApiError(401, mensaje);
+}
+
+export function forbidden(mensaje = 'No tenés permisos para esta operación') {
+  return new ApiError(403, mensaje);
+}

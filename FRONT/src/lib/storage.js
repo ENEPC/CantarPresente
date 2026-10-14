@@ -5,6 +5,7 @@ export const KEYS = {
   students: 'cp_students',
   attendances: 'cp_attendances',
   outbox: 'cp_outbox',
+  sesion: 'cp_sesion',
 };
 
 export function leerJson(key, fallback) {

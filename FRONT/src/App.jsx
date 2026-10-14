@@ -1,14 +1,18 @@
 import { useState, useEffect, useRef } from 'react';
 import Header from './components/Header';
+import LoginView from './components/LoginView';
 import Navbar from './components/Navbar';
 import AttendanceView from './components/AttendanceView';
 import ParticipantsView from './components/ParticipantsView';
 import ChoirsView from './components/ChoirsView';
 import HistoryView from './components/HistoryView';
+import VoluntariosView from './components/VoluntariosView';
 import StudentModal from './components/StudentModal';
 import ChoirModal from './components/ChoirModal';
 import { INITIAL_CHOIRS, INITIAL_STUDENTS } from './data/initialData';
 import { KEYS, leerJson, guardarJson, migrarStorage, pedirPersistencia } from './lib/storage';
+import { leerSesion, guardarSesion, borrarSesion } from './lib/auth';
+import { me } from './api/auth';
 import { enqueue } from './lib/outbox';
 import { useSync, construirLote } from './lib/sync';
 import { useOnline } from './lib/useOnline';
@@ -16,6 +20,43 @@ import { useOnline } from './lib/useOnline';
 migrarStorage();
 
 export default function App() {
+  const [sesion, setSesion] = useState(() => leerSesion());
+
+  // Token vencido o usuario desactivado detectado en cualquier request: al login.
+  useEffect(() => {
+    const alExpirada = () => setSesion(null);
+    window.addEventListener('cp:auth-expirada', alExpirada);
+    return () => window.removeEventListener('cp:auth-expirada', alExpirada);
+  }, []);
+
+  // Con sesión guardada y red disponible al arrancar: refrescar los datos del
+  // usuario contra el servidor. Offline se sigue con la sesión local sin validar
+  // (el caso de las sedes sin conexión).
+  useEffect(() => {
+    if (!leerSesion() || !navigator.onLine) return;
+    me()
+      .then((usuario) => {
+        setSesion((actual) => {
+          if (!actual) return null;
+          const nueva = { ...actual, usuario: { ...actual.usuario, ...usuario } };
+          guardarSesion(nueva);
+          return nueva;
+        });
+      })
+      .catch(() => {}); // 401 dispara cp:auth-expirada; sin red se sigue con lo local
+  }, []);
+
+  const cerrarSesion = () => {
+    borrarSesion();
+    setSesion(null);
+  };
+
+  if (!sesion) return <LoginView onLogin={setSesion} />;
+
+  return <AppAutenticada usuario={sesion.usuario} onLogout={cerrarSesion} />;
+}
+
+function AppAutenticada({ usuario, onLogout }) {
   const [currentTab, setCurrentTab] = useState('attendance');
 
   // Estado local (fuente de verdad mientras no hay conexión)
@@ -143,6 +184,8 @@ export default function App() {
         errores={errores}
         sincronizando={sincronizando}
         onSync={sincronizar}
+        usuario={usuario}
+        onLogout={onLogout}
       />
 
       <main className="flex-1 p-4">
@@ -194,9 +237,11 @@ export default function App() {
             students={students}
           />
         )}
+
+        {currentTab === 'voluntarios' && <VoluntariosView />}
       </main>
 
-      <Navbar currentTab={currentTab} setCurrentTab={setCurrentTab} />
+      <Navbar currentTab={currentTab} setCurrentTab={setCurrentTab} usuario={usuario} />
 
       <StudentModal
         isOpen={isStudentModalOpen}

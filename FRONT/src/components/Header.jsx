@@ -4,6 +4,8 @@ export default function Header({
   errores = 0,
   sincronizando = false,
   onSync,
+  usuario,
+  onLogout,
 }) {
   const hayPendientes = pendientes > 0 || errores > 0;
   const estado = !online
@@ -22,7 +24,9 @@ export default function Header({
           <span className="text-2xl">🎵</span>
           <div>
             <h1 className="text-lg font-bold leading-tight">Cantar Presente</h1>
-            <p className="text-xs text-blue-200">Sembrar Cantando · Offline-first</p>
+            <p className="text-xs text-blue-200">
+              {usuario ? `${usuario.nombre} ${usuario.apellido}` : 'Sembrar Cantando'}
+            </p>
           </div>
         </div>
 
@@ -35,6 +39,16 @@ export default function Header({
               className="text-xs font-semibold bg-white text-blue-700 px-2.5 py-1.5 rounded-lg shadow-sm transition-colors disabled:opacity-60 cursor-pointer"
             >
               {sincronizando ? 'Sincronizando…' : 'Sincronizar'}
+            </button>
+          )}
+          {onLogout && (
+            <button
+              type="button"
+              onClick={onLogout}
+              title="Cerrar sesión"
+              className="text-xs font-semibold text-blue-200 hover:text-white transition-colors cursor-pointer"
+            >
+              Salir
             </button>
           )}
           <span

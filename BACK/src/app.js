@@ -1,10 +1,13 @@
 import express from 'express';
 import cors from 'cors';
 import { errorHandler } from './middlewares/errorHandler.js';
+import { requireAuth } from './middlewares/auth.js';
+import authRoutes from './routes/auth.routes.js';
 import bootstrapRoutes from './routes/bootstrap.routes.js';
 import attendancesRoutes from './routes/attendances.routes.js';
 import studentsRoutes from './routes/students.routes.js';
 import choirsRoutes from './routes/choirs.routes.js';
+import usersRoutes from './routes/users.routes.js';
 
 export function createApp() {
   const app = express();
@@ -17,7 +20,17 @@ export function createApp() {
     res.status(200).json({ status: 'ok', message: 'Servidor Cantar Presente en línea' });
   });
 
-  app.use('/api', bootstrapRoutes, attendancesRoutes, studentsRoutes, choirsRoutes);
+  // /auth/login es público; /auth/me pide token internamente.
+  app.use('/api', authRoutes);
+  app.use(
+    '/api',
+    requireAuth,
+    bootstrapRoutes,
+    attendancesRoutes,
+    studentsRoutes,
+    choirsRoutes,
+    usersRoutes
+  );
 
   app.use(errorHandler);
 

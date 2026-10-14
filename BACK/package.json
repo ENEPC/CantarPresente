@@ -5,12 +5,15 @@
   "scripts": {
     "dev": "node --watch src/server.js",
     "start": "node src/server.js",
-    "migrate": "node db/migrations/migrate.js"
+    "migrate": "node db/migrations/migrate.js",
+    "seed": "node db/seeds/run.js"
   },
   "dependencies": {
+    "bcryptjs": "^3.0.3",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
+    "jsonwebtoken": "^9.0.3",
     "pg": "^8.23.1",
     "serverless-http": "^4.0.0",
     "zod": "^4.6.5"

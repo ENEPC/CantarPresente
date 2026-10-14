@@ -18,7 +18,7 @@ const querySchema = z
 router.post(
   '/attendances/sync',
   asyncHandler(async (req, res) => {
-    res.json(await processSync(req.body));
+    res.json(await processSync(req.body, req.usuario.id));
   })
 );
 
