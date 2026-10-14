@@ -1,10 +1,15 @@
-import { getCorosParaUsuario, getParticipantesParaUsuario } from '../repositories/bootstrap.repo.js';
+import {
+  getCorosParaUsuario,
+  getParticipantesParaUsuario,
+  getClasesConAsistencias,
+} from '../repositories/bootstrap.repo.js';
 
-// Contrato con la PWA: coros (con su sede) y estudiantes (con sus coros asignados).
+// Contrato con la PWA: coros (con su sede), estudiantes (con sus coros asignados) y asistencias guardadas.
 // usuarioId queda null hasta que exista auth (RF-03): devuelve todo el padrón.
 export async function getBootstrap(usuarioId = null) {
   const coros = await getCorosParaUsuario(usuarioId);
   const filas = await getParticipantesParaUsuario(usuarioId);
+  const clasesGuardadas = await getClasesConAsistencias(usuarioId);
 
   const estudiantes = new Map();
   for (const fila of filas) {
@@ -15,5 +20,9 @@ export async function getBootstrap(usuarioId = null) {
     estudiantes.get(participante.id).coroIds.push(coroId);
   }
 
-  return { coros, students: [...estudiantes.values()] };
+  return {
+    coros,
+    students: [...estudiantes.values()],
+    attendances: clasesGuardadas,
+  };
 }

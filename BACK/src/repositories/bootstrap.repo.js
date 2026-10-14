@@ -38,3 +38,51 @@ export async function getParticipantesParaUsuario(usuarioId = null, db = pool) {
     rol: r.rol,
   }));
 }
+
+export async function getClasesConAsistencias(usuarioId = null, db = pool) {
+  // 1. Obtener las clases de los coros habilitados para el usuario
+  const { rows: clases } = await db.query(
+    `SELECT c.id, c.coro_id, TO_CHAR(c.fecha::date, 'YYYY-MM-DD') AS fecha, c.created_at, c.updated_at
+     FROM clases c
+     JOIN coros co ON co.id = c.coro_id AND co.deleted_at IS NULL
+     WHERE ($1::uuid IS NULL OR EXISTS (
+       SELECT 1 FROM usuarios_coros uc WHERE uc.usuario_id = $1 AND uc.coro_id = c.coro_id
+     ))
+     ORDER BY c.fecha DESC`,
+    [usuarioId]
+  );
+
+  if (clases.length === 0) return [];
+
+  const claseIds = clases.map((c) => c.id);
+
+  // 2. Traer el detalle de presentes y ausentes de esas clases
+  const { rows: asistencias } = await db.query(
+    `SELECT clase_id, participante_id, estado
+     FROM asistencias
+     WHERE clase_id = ANY($1::uuid[])`,
+    [claseIds]
+  );
+
+  // 3. Mapear cada clase con su diccionario de asistencias { [participanteId]: 'presente' | 'ausente' }
+  return clases.map((clase) => {
+    const mapaAsistencias = {};
+    asistencias
+      .filter((a) => a.clase_id === clase.id)
+      .forEach((a) => {
+        const estadoStr = a.estado?.toString().toLowerCase();
+        mapaAsistencias[a.participante_id] =
+          estadoStr === 'presente' || a.estado === true ? 'presente' : 'ausente';
+      });
+
+    return {
+      id: clase.id,
+      coroId: clase.coro_id,
+      fecha: clase.fecha,
+      asistencias: mapaAsistencias,
+      synced: true,
+      createdAt: clase.created_at,
+      updatedAt: clase.updated_at,
+    };
+  });
+}

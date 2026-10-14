@@ -7,6 +7,7 @@ export default function Navbar({ currentTab, setCurrentTab, usuario }) {
     { id: 'students', label: 'Alumnos', icon: '👥' },
     { id: 'choirs', label: 'Coros/Sedes', icon: '🏛️', adminOnly: true },
     { id: 'history', label: 'Historial', icon: '📜' },
+    { id: 'stats', label: 'Estadísticas', icon: '📊' }, // 👈 Nueva pestaña
     { id: 'voluntarios', label: 'Voluntarios', icon: '🙋', adminOnly: true },
   ];
 
@@ -14,19 +15,24 @@ export default function Navbar({ currentTab, setCurrentTab, usuario }) {
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-slate-200 shadow-lg">
-      <div className={`max-w-md mx-auto grid px-1 py-1 ${visibles.length === 3 ? 'grid-cols-3' : 'grid-cols-5'}`}>
+      <div
+        className="max-w-md mx-auto grid px-1 py-1"
+        style={{ gridTemplateColumns: `repeat(${visibles.length}, minmax(0, 1fr))` }}
+      >
         {visibles.map((tab) => {
           const isActive = currentTab === tab.id;
           return (
             <button
               key={tab.id}
               onClick={() => setCurrentTab(tab.id)}
-              className={`flex flex-col items-center justify-center py-1.5 transition-colors ${
+              className={`flex flex-col items-center justify-center py-1.5 transition-colors cursor-pointer ${
                 isActive ? 'text-blue-600 font-semibold' : 'text-slate-400 hover:text-slate-600'
               }`}
             >
-              <span className="text-lg leading-tight">{tab.icon}</span>
-              <span className="text-[10px] mt-0.5 leading-tight">{tab.label}</span>
+              <span className="text-base sm:text-lg leading-tight">{tab.icon}</span>
+              <span className="text-[9px] sm:text-[10px] mt-0.5 leading-tight truncate px-0.5">
+                {tab.label}
+              </span>
             </button>
           );
         })}

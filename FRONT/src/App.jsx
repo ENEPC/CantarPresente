@@ -6,6 +6,7 @@ import AttendanceView from './components/AttendanceView';
 import ParticipantsView from './components/ParticipantsView';
 import ChoirsView from './components/ChoirsView';
 import HistoryView from './components/HistoryView';
+import StatsView from './components/StatsView'; // 👈 Import de estadísticas
 import VoluntariosView from './components/VoluntariosView';
 import StudentModal from './components/StudentModal';
 import ChoirModal from './components/ChoirModal';
@@ -30,8 +31,7 @@ export default function App() {
   }, []);
 
   // Con sesión guardada y red disponible al arrancar: refrescar los datos del
-  // usuario contra el servidor. Offline se sigue con la sesión local sin validar
-  // (el caso de las sedes sin conexión).
+  // usuario contra el servidor. Offline se sigue con la sesión local sin validar.
   useEffect(() => {
     if (!leerSesion() || !navigator.onLine) return;
     me()
@@ -43,7 +43,7 @@ export default function App() {
           return nueva;
         });
       })
-      .catch(() => {}); // 401 dispara cp:auth-expirada; sin red se sigue con lo local
+      .catch(() => {});
   }, []);
 
   const cerrarSesion = () => {
@@ -81,7 +81,7 @@ function AppAutenticada({ usuario, onLogout }) {
     if (navigator.onLine) sincronizar();
   }, [sincronizar]);
 
-  // Al recuperar la conexión, drenar la cola (sin repetir en el montaje).
+  // Al recuperar la conexión, drenar la cola.
   const primerRender = useRef(true);
   useEffect(() => {
     if (primerRender.current) {
@@ -97,7 +97,7 @@ function AppAutenticada({ usuario, onLogout }) {
   const [isChoirModalOpen, setIsChoirModalOpen] = useState(false);
   const [editingChoir, setEditingChoir] = useState(null);
 
-  // Handlers Alumnos: local-first (estado + persistencia) y encolar para el sync
+  // Handlers Alumnos
   const handleSaveStudent = (alumno) => {
     if (editingStudent) {
       setStudents((prev) => prev.map((s) => (s.id === alumno.id ? alumno : s)));
@@ -135,7 +135,6 @@ function AppAutenticada({ usuario, onLogout }) {
   };
 
   const handleDeleteChoir = (choirId) => {
-    // Comprobar si algún alumno tiene este coro en sus asignaciones
     const assignedStudents = students.filter((s) =>
       (Array.isArray(s.coroIds) ? s.coroIds : []).includes(choirId)
     );
@@ -235,6 +234,15 @@ function AppAutenticada({ usuario, onLogout }) {
             attendances={attendances}
             choirs={choirs}
             students={students}
+          />
+        )}
+
+        {/* 👈 Vista de Estadísticas integrada */}
+        {currentTab === 'stats' && (
+          <StatsView
+            choirs={choirs}
+            students={students}
+            attendances={attendances}
           />
         )}
 
