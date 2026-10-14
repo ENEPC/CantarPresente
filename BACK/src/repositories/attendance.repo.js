@@ -49,7 +49,9 @@ export async function insertSincronizacion(log, db = pool) {
     `INSERT INTO sincronizaciones (dispositivo_id, usuario_id, registros_ok, registros_err, estado, detalle)
      VALUES ($1, $2, $3, $4, $5, $6)
      RETURNING *`,
-    [log.dispositivoId, log.usuarioId ?? null, log.registrosOk, log.registrosErr, log.estado, log.detalle ?? null]
+    // pg serializa los arrays como array literal de Postgres ("{...}"), que no es JSON
+    // válido para la columna detalle; hay que convertir a JSON explícitamente.
+    [log.dispositivoId, log.usuarioId ?? null, log.registrosOk, log.registrosErr, log.estado, log.detalle ? JSON.stringify(log.detalle) : null]
   );
   return rows[0];
 }
