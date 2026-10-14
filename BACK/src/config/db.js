@@ -1,7 +1,8 @@
 import 'dotenv/config';
 import pg from 'pg';
 
-const isServerless = Boolean(process.env.VERCEL);
+//const isServerless = Boolean(process.env.VERCEL);
+const isServerless = true;
 
 export const pool = new pg.Pool({
   // Serverless usa el pooler de Supabase (modo transacción, puerto 6543) para no
