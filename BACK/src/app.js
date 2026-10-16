@@ -36,3 +36,7 @@ export function createApp() {
 
   return app;
 }
+
+// Instancia y exportación por defecto requerida por Vercel
+const app = createApp();
+export default app;
