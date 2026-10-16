@@ -6,8 +6,9 @@ import AttendanceView from './components/AttendanceView';
 import ParticipantsView from './components/ParticipantsView';
 import ChoirsView from './components/ChoirsView';
 import HistoryView from './components/HistoryView';
-import StatsView from './components/StatsView'; // 👈 Import de estadísticas
+import StatsView from './components/StatsView';
 import VoluntariosView from './components/VoluntariosView';
+import InstallButton from './components/InstallButton';
 import StudentModal from './components/StudentModal';
 import ChoirModal from './components/ChoirModal';
 import { INITIAL_CHOIRS, INITIAL_STUDENTS } from './data/initialData';
@@ -188,6 +189,9 @@ function AppAutenticada({ usuario, onLogout }) {
       />
 
       <main className="flex-1 p-4">
+        {/* Botón de instalación (se oculta automáticamente si ya está instalada) */}
+        <InstallButton />
+
         {currentTab === 'attendance' && (
           <AttendanceView
             choirs={choirs}
@@ -237,7 +241,6 @@ function AppAutenticada({ usuario, onLogout }) {
           />
         )}
 
-        {/* 👈 Vista de Estadísticas integrada */}
         {currentTab === 'stats' && (
           <StatsView
             choirs={choirs}
