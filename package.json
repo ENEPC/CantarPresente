@@ -1,0 +1,9 @@
+{
+  "name": "cantar-presente",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "FRONT",
+    "BACK"
+  ]
+}

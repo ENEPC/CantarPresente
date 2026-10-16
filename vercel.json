@@ -1,0 +1,10 @@
+{
+  "buildCommand": "npm run build --prefix FRONT",
+  "outputDirectory": "FRONT/dist",
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "/api"
+    }
+  ]
+}
