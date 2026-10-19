@@ -135,35 +135,43 @@ function AppAutenticada({ usuario, onLogout }) {
     if (navigator.onLine) sincronizar();
   };
 
-  const handleDeleteChoir = (choirId) => {
-    const assignedStudents = students.filter((s) =>
-      (Array.isArray(s.coroIds) ? s.coroIds : []).includes(choirId)
-    );
+  // Baja lógica del coro: solo cambia activo, igual que el toggle de participantes.
+  // Al desactivar, los alumnos que tienen únicamente ese coro también pasan a
+  // inactivos (conservando su asignación al coro).
+  const handleToggleChoirStatus = (choirId) => {
+    const actualizado = choirs.find((c) => c.id === choirId);
+    if (!actualizado) return;
+    const desactivando = actualizado.activo;
+    const ahora = new Date().toISOString();
+    const conEstado = {
+      ...actualizado,
+      activo: !actualizado.activo,
+      updatedAt: ahora,
+    };
+    setChoirs((prev) => prev.map((c) => (c.id === choirId ? conEstado : c)));
 
-    if (assignedStudents.length > 0) {
-      alert(
-        `No se puede eliminar este coro porque tiene ${assignedStudents.length} participante(s) asignado(s). Reasigná o eliminá los alumnos primero.`
+    if (desactivando) {
+      const exclusivos = students.filter((s) => {
+        const ids = Array.isArray(s.coroIds) ? s.coroIds : [];
+        return s.activo && ids.length === 1 && ids[0] === choirId;
+      });
+      setStudents((prev) =>
+        prev.map((s) =>
+          exclusivos.some((a) => a.id === s.id)
+            ? { ...s, activo: false, updatedAt: ahora }
+            : s
+        )
       );
-      return;
-    }
-
-    const confirmDelete = window.confirm(
-      '¿Estás seguro de que deseás eliminar este coro/sede?'
-    );
-
-    if (confirmDelete) {
-      const coro = choirs.find((c) => c.id === choirId);
-      if (coro) {
-        const dadoDeBaja = {
-          ...coro,
-          activo: false,
-          updatedAt: new Date().toISOString(),
-        };
-        enqueue('editarCoro', dadoDeBaja);
+      for (const s of exclusivos) {
+        enqueue('editarAlumno', { ...s, activo: false, updatedAt: ahora });
       }
-      setChoirs((prev) => prev.filter((c) => c.id !== choirId));
-      if (navigator.onLine) sincronizar();
     }
+
+    // El payload al servidor no lleva sede: el schema del backend es estricto y
+    // rechaza el objeto completo (con id) que trae el estado local.
+    const { sede, ...payload } = conEstado;
+    enqueue('editarCoro', payload);
+    if (navigator.onLine) sincronizar();
   };
 
   // Handler Asistencia
@@ -229,7 +237,7 @@ function AppAutenticada({ usuario, onLogout }) {
               setEditingChoir(c);
               setIsChoirModalOpen(true);
             }}
-            onDeleteChoir={handleDeleteChoir}
+            onToggleChoirStatus={handleToggleChoirStatus}
           />
         )}
 
@@ -237,7 +245,6 @@ function AppAutenticada({ usuario, onLogout }) {
           <HistoryView
             attendances={attendances}
             choirs={choirs}
-            students={students}
           />
         )}
 
