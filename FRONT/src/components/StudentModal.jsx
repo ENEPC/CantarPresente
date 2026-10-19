@@ -43,9 +43,6 @@ export default function StudentModal({
     if (!nombre.trim() || !apellido.trim()) {
       return alert('El nombre y apellido son obligatorios.');
     }
-    if (selectedChoirIds.length === 0) {
-      return alert('Debés asignar al participante a por lo menos un coro o sede.');
-    }
 
     const ahora = new Date().toISOString();
     onSave({
@@ -125,7 +122,7 @@ export default function StudentModal({
 
           <div>
             <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-              Coros a los que pertenece * (podés marcar varios)
+              Coros a los que pertenece (podés marcar varios)
             </label>
             <div className="space-y-1.5 max-h-36 overflow-y-auto border border-slate-200 rounded-lg p-2 bg-slate-50">
               {choirs.map((choir) => {

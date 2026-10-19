@@ -5,8 +5,10 @@ import { parseBody } from '../utils/validate.js';
 import { badRequest, notFound } from '../utils/errors.js';
 
 // Mapeo coro/sede (opción A): el coro llega con su sede; ensureSede la crea si no existe.
+// id opcional: el cliente puede mandar el objeto sede completo (con id); ensureSede lo ignora.
 const sedeApiSchema = z
   .object({
+    id: z.string().uuid().optional(),
     nombre: z.string().min(1).max(120),
     localidad: z.string().max(120).nullable().optional(),
   })

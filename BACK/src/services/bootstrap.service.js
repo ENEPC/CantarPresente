@@ -17,7 +17,8 @@ export async function getBootstrap(usuarioId = null) {
     if (!estudiantes.has(participante.id)) {
       estudiantes.set(participante.id, { ...participante, coroIds: [] });
     }
-    estudiantes.get(participante.id).coroIds.push(coroId);
+    // coroId null = participante sin membresía activa (huérfano)
+    if (coroId) estudiantes.get(participante.id).coroIds.push(coroId);
   }
 
   return {

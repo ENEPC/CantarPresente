@@ -23,12 +23,16 @@ export async function getCorosParaUsuario(usuarioId = null, db = pool) {
 }
 
 export async function getParticipantesParaUsuario(usuarioId = null, db = pool) {
+  // LEFT JOIN: los participantes sin membresía activa (huérfanos) también viajan
+  // al frontend, con coro_id null. Incluye inactivos (sin filtro p.activo): las
+  // vistas filtran activo por su cuenta. Para usuarios no-admin, FILTRO_USUARIO
+  // excluye a los huérfanos porque c.id es null y el EXISTS no matchea.
   const { rows } = await db.query(
     `SELECT p.*, pc.coro_id, pc.rol
      FROM participantes p
-     JOIN participantes_coros pc ON pc.participante_id = p.id AND pc.fecha_baja IS NULL
-     JOIN coros c ON c.id = pc.coro_id AND c.deleted_at IS NULL
-     WHERE p.deleted_at IS NULL AND p.activo AND ${FILTRO_USUARIO}
+     LEFT JOIN participantes_coros pc ON pc.participante_id = p.id AND pc.fecha_baja IS NULL
+     LEFT JOIN coros c ON c.id = pc.coro_id AND c.deleted_at IS NULL
+     WHERE p.deleted_at IS NULL AND ${FILTRO_USUARIO}
      ORDER BY p.apellido, p.nombre`,
     [usuarioId]
   );

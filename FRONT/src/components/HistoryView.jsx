@@ -1,4 +1,4 @@
-export default function HistoryView({ attendances = [], choirs = [], students = [] }) {
+export default function HistoryView({ attendances = [], choirs = [] }) {
   const sortedAttendances = [...attendances].sort((a, b) => b.fecha.localeCompare(a.fecha));
 
   return (
@@ -19,14 +19,12 @@ export default function HistoryView({ attendances = [], choirs = [], students = 
           sortedAttendances.map((item, index) => {
             const choir = choirs.find((c) => c.id === item.coroId);
 
-            const choirStudents = students.filter((s) => {
-              if (!s.activo) return false;
-              return (Array.isArray(s.coroIds) ? s.coroIds : []).includes(item.coroId);
-            });
-
-            const total = choirStudents.length;
-            const presents = choirStudents.filter(
-              (s) => item.asistencias?.[s.id] === 'presente'
+            // Los totales salen del registro guardado de la clase, no del padrón
+            // actual: dar de baja un alumno no debe alterar clases pasadas.
+            const asistencias = item.asistencias || {};
+            const total = Object.keys(asistencias).length;
+            const presents = Object.values(asistencias).filter(
+              (estado) => estado === 'presente'
             ).length;
             const absents = total - presents;
             const percentage = total > 0 ? Math.round((presents / total) * 100) : 0;

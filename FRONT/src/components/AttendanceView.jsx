@@ -7,15 +7,16 @@ export default function AttendanceView({
   attendances = [],
   onSaveAttendance,
 }) {
-  const [selectedChoirId, setSelectedChoirId] = useState(() => choirs[0]?.id || '');
+  const activeChoirs = choirs.filter((c) => c.activo);
+  const [selectedChoirId, setSelectedChoirId] = useState(() => activeChoirs[0]?.id || '');
   const [selectedDate, setSelectedDate] = useState(
     () => new Date().toISOString().split('T')[0]
   );
   const [currentAttendance, setCurrentAttendance] = useState({});
 
   useEffect(() => {
-    if (choirs.length > 0 && !choirs.some((c) => c.id === selectedChoirId)) {
-      setSelectedChoirId(choirs[0].id);
+    if (activeChoirs.length > 0 && !activeChoirs.some((c) => c.id === selectedChoirId)) {
+      setSelectedChoirId(activeChoirs[0].id);
     }
   }, [choirs, selectedChoirId]);
 
@@ -94,7 +95,7 @@ export default function AttendanceView({
               onChange={(e) => setSelectedChoirId(e.target.value)}
               className="w-full text-sm mt-1 p-2 border border-slate-300 rounded-lg bg-white"
             >
-              {(choirs || []).map((c) => (
+              {activeChoirs.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.nombre}
                 </option>

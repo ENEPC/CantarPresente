@@ -120,9 +120,10 @@ export function useSync({ setChoirs, setStudents, setAttendances }) {
         pendientesIds.has(`${TIPOS.crearCoro}:${c.id}`) ||
         pendientesIds.has(`${TIPOS.editarCoro}:${c.id}`)
       );
+      // Incluye coros inactivos: la baja es lógica (activo=false) y deben
+      // poder verse/reactivarse desde la UI, igual que los participantes.
       const servidor = (data.coros || []).filter(
         (c) =>
-          c.activo &&
           !pendientesIds.has(`${TIPOS.crearCoro}:${c.id}`) &&
           !pendientesIds.has(`${TIPOS.editarCoro}:${c.id}`)
       );

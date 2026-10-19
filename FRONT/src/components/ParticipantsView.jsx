@@ -14,7 +14,14 @@ export default function ParticipantsView({
     const studentChoirIds = Array.isArray(student.coroIds) ? student.coroIds : [];
 
     const belongsToChoir =
-      filterChoirId === 'all' || studentChoirIds.includes(filterChoirId);
+      filterChoirId === 'inactivos'
+        ? !student.activo
+        : student.activo &&
+          (filterChoirId === 'all'
+            ? studentChoirIds.length > 0
+            : filterChoirId === 'none'
+              ? studentChoirIds.length === 0
+              : studentChoirIds.includes(filterChoirId));
 
     const matchesSearch =
       `${student.nombre} ${student.apellido} ${student.responsableNombre || ''}`
@@ -60,6 +67,8 @@ export default function ParticipantsView({
               {c.nombre}
             </option>
           ))}
+          <option value="none">Alumnos sin asignar</option>
+          <option value="inactivos">Alumnos Inactivos</option>
         </select>
       </div>
 
