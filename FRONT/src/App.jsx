@@ -11,6 +11,7 @@ import VoluntariosView from './components/VoluntariosView';
 import InstallButton from './components/InstallButton';
 import StudentModal from './components/StudentModal';
 import ChoirModal from './components/ChoirModal';
+import StudentHistoryView from './components/StudentHistoryView';
 import { INITIAL_CHOIRS, INITIAL_STUDENTS } from './data/initialData';
 import { KEYS, leerJson, guardarJson, migrarStorage, pedirPersistencia } from './lib/storage';
 import { leerSesion, guardarSesion, borrarSesion } from './lib/auth';
@@ -97,6 +98,10 @@ function AppAutenticada({ usuario, onLogout }) {
   const [editingStudent, setEditingStudent] = useState(null);
   const [isChoirModalOpen, setIsChoirModalOpen] = useState(false);
   const [editingChoir, setEditingChoir] = useState(null);
+
+  // Detalle de alumno (historial de asistencias); se resetea al cambiar de pestaña.
+  const [studentDetail, setStudentDetail] = useState(null);
+  useEffect(() => setStudentDetail(null), [currentTab]);
 
   // Handlers Alumnos
   const handleSaveStudent = (alumno) => {
@@ -209,7 +214,14 @@ function AppAutenticada({ usuario, onLogout }) {
           />
         )}
 
-        {currentTab === 'students' && (
+        {currentTab === 'students' && (studentDetail ? (
+          <StudentHistoryView
+            student={studentDetail}
+            attendances={attendances}
+            choirs={choirs}
+            onBack={() => setStudentDetail(null)}
+          />
+        ) : (
           <ParticipantsView
             students={students}
             choirs={choirs}
@@ -222,8 +234,9 @@ function AppAutenticada({ usuario, onLogout }) {
               setIsStudentModalOpen(true);
             }}
             onToggleStatus={handleToggleStudentStatus}
+            onSelectStudent={setStudentDetail}
           />
-        )}
+        ))}
 
         {currentTab === 'choirs' && (
           <ChoirsView

@@ -6,6 +6,7 @@ export default function ParticipantsView({
   onAddStudent,
   onEditStudent,
   onToggleStatus,
+  onSelectStudent,
 }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterChoirId, setFilterChoirId] = useState('all');
@@ -86,7 +87,8 @@ export default function ParticipantsView({
             return (
               <div
                 key={s.id}
-                className={`p-3 bg-white border rounded-xl shadow-xs transition-opacity ${
+                onClick={() => onSelectStudent(s)}
+                className={`p-3 bg-white border rounded-xl shadow-xs transition-opacity cursor-pointer ${
                   s.activo ? 'border-slate-200' : 'border-slate-100 opacity-60 bg-slate-50/50'
                 }`}
               >
@@ -103,7 +105,10 @@ export default function ParticipantsView({
                   <div className="flex items-center gap-1">
                     <button
                       type="button"
-                      onClick={() => onEditStudent(s)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onEditStudent(s);
+                      }}
                       className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors text-xs font-medium cursor-pointer"
                       title="Editar"
                     >
@@ -111,7 +116,10 @@ export default function ParticipantsView({
                     </button>
                     <button
                       type="button"
-                      onClick={() => onToggleStatus(s.id)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onToggleStatus(s.id);
+                      }}
                       className={`px-2 py-1 text-[11px] font-semibold rounded-lg transition-colors cursor-pointer ${
                         s.activo
                           ? 'bg-emerald-50 text-emerald-700 hover:bg-rose-50 hover:text-rose-700'
