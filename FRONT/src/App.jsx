@@ -11,6 +11,7 @@ import VoluntariosView from './components/VoluntariosView';
 import InstallButton from './components/InstallButton';
 import StudentModal from './components/StudentModal';
 import ChoirModal from './components/ChoirModal';
+import ErroresPanel from './components/ErroresPanel';
 import StudentHistoryView from './components/StudentHistoryView';
 import { INITIAL_CHOIRS, INITIAL_STUDENTS } from './data/initialData';
 import { KEYS, leerJson, guardarJson, migrarStorage, pedirPersistencia } from './lib/storage';
@@ -71,11 +72,12 @@ function AppAutenticada({ usuario, onLogout }) {
   useEffect(() => guardarJson(KEYS.attendances, attendances), [attendances]);
 
   const online = useOnline();
-  const { pendientes, errores, sincronizando, sincronizar } = useSync({
-    setChoirs,
-    setStudents,
-    setAttendances,
-  });
+  const { pendientes, errores, erroresDetalle, sincronizando, sincronizar, descartarError } =
+    useSync({
+      setChoirs,
+      setStudents,
+      setAttendances,
+    });
 
   // Al montar: pedir almacenamiento persistente y, si hay conexión, sincronizar.
   useEffect(() => {
@@ -98,6 +100,7 @@ function AppAutenticada({ usuario, onLogout }) {
   const [editingStudent, setEditingStudent] = useState(null);
   const [isChoirModalOpen, setIsChoirModalOpen] = useState(false);
   const [editingChoir, setEditingChoir] = useState(null);
+  const [isErroresPanelOpen, setIsErroresPanelOpen] = useState(false);
 
   // Detalle de alumno (historial de asistencias); se resetea al cambiar de pestaña.
   const [studentDetail, setStudentDetail] = useState(null);
@@ -199,6 +202,7 @@ function AppAutenticada({ usuario, onLogout }) {
         onSync={sincronizar}
         usuario={usuario}
         onLogout={onLogout}
+        onOpenErrores={() => setIsErroresPanelOpen(true)}
       />
 
       <main className="flex-1 p-4">
@@ -287,6 +291,14 @@ function AppAutenticada({ usuario, onLogout }) {
         onClose={() => setIsChoirModalOpen(false)}
         onSave={handleSaveChoir}
         editingChoir={editingChoir}
+      />
+
+      <ErroresPanel
+        isOpen={isErroresPanelOpen}
+        errores={erroresDetalle}
+        choirs={choirs}
+        onClose={() => setIsErroresPanelOpen(false)}
+        onDescartar={descartarError}
       />
     </div>
   );

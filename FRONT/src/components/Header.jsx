@@ -6,16 +6,25 @@ export default function Header({
   onSync,
   usuario,
   onLogout,
+  onOpenErrores,
 }) {
-  const hayPendientes = pendientes > 0 || errores > 0;
+  const hayPendientes = pendientes > 0;
+  const hayErrores = errores > 0;
   const estado = !online
     ? { texto: 'Sin conexión', clase: 'bg-slate-500' }
+    : hayErrores
+    ? { texto: `${errores} ${errores === 1 ? 'error' : 'errores'} · Revisar`, clase: 'bg-red-600' }
     : hayPendientes
-    ? {
-        texto: `${pendientes} por sincronizar${errores > 0 ? ` · ${errores} con error` : ''}`,
-        clase: 'bg-amber-500',
-      }
+    ? { texto: `${pendientes} por sincronizar`, clase: 'bg-amber-500' }
     : { texto: 'Sincronizado', clase: 'bg-emerald-500' };
+
+  const pillClase = `text-[10px] text-white font-semibold px-2 py-0.5 rounded-full flex items-center gap-1 ${estado.clase}`;
+  const pillContenido = (
+    <>
+      <span className="w-2 h-2 rounded-full bg-white animate-pulse"></span>
+      {estado.texto}
+    </>
+  );
 
   return (
     <header className="bg-blue-700 text-white p-4 shadow-md sticky top-0 z-30">
@@ -51,12 +60,18 @@ export default function Header({
               Salir
             </button>
           )}
-          <span
-            className={`text-[10px] text-white font-semibold px-2 py-0.5 rounded-full flex items-center gap-1 ${estado.clase}`}
-          >
-            <span className="w-2 h-2 rounded-full bg-white animate-pulse"></span>
-            {estado.texto}
-          </span>
+          {hayErrores && onOpenErrores ? (
+            <button
+              type="button"
+              onClick={onOpenErrores}
+              title="Revisar y gestionar los errores de sincronización"
+              className={`${pillClase} cursor-pointer`}
+            >
+              {pillContenido}
+            </button>
+          ) : (
+            <span className={pillClase}>{pillContenido}</span>
+          )}
         </div>
       </div>
     </header>

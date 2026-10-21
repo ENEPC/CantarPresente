@@ -6,6 +6,7 @@ const FECHA = /^\d{4}-\d{2}-\d{2}$/;
 export const participanteCampos = {
   nombre: z.string().min(1).max(120),
   apellido: z.string().min(1).max(120),
+  dni: z.string().regex(/^\d{7,8}$/),
   fechaNacimiento: z.string().regex(FECHA).nullable(),
   responsableNombre: z.string().max(120).nullable(),
   responsableTelefono: z.string().max(60).nullable(),
@@ -35,6 +36,7 @@ export function participanteFromDb(row) {
     id: row.id,
     nombre: row.nombre,
     apellido: row.apellido,
+    dni: row.dni,
     fechaNacimiento: toYmd(row.fecha_nacimiento),
     responsableNombre: row.responsable_nombre,
     responsableTelefono: row.responsable_telefono,
@@ -51,6 +53,7 @@ export function participanteToDb(participante) {
     id: participante.id,
     nombre: participante.nombre,
     apellido: participante.apellido,
+    dni: participante.dni,
     fecha_nacimiento: participante.fechaNacimiento ?? null,
     responsable_nombre: participante.responsableNombre ?? null,
     responsable_telefono: participante.responsableTelefono ?? null,

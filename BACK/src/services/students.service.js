@@ -16,6 +16,7 @@ const createApiSchema = z
     id: z.string().uuid().optional(),
     nombre: participanteCampos.nombre,
     apellido: participanteCampos.apellido,
+    dni: participanteCampos.dni,
     fechaNacimiento: participanteCampos.fechaNacimiento.nullable().optional(),
     responsableNombre: participanteCampos.responsableNombre.nullable().optional(),
     responsableTelefono: participanteCampos.responsableTelefono.nullable().optional(),
@@ -29,6 +30,7 @@ const updateApiSchema = z
   .object({
     nombre: participanteCampos.nombre.optional(),
     apellido: participanteCampos.apellido.optional(),
+    dni: participanteCampos.dni.optional(),
     fechaNacimiento: participanteCampos.fechaNacimiento.nullable().optional(),
     responsableNombre: participanteCampos.responsableNombre.nullable().optional(),
     responsableTelefono: participanteCampos.responsableTelefono.nullable().optional(),

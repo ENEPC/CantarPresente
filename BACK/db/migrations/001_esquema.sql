@@ -62,6 +62,7 @@ CREATE TABLE participantes (
     id                    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     nombre                TEXT NOT NULL,
     apellido              TEXT NOT NULL,
+    dni                   TEXT NOT NULL UNIQUE,
     fecha_nacimiento      DATE,
     responsable_nombre    TEXT,
     responsable_telefono  TEXT,

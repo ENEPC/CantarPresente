@@ -6,6 +6,7 @@ import { membresiaFromDb, membresiaToDb } from '../models/membresia.model.js';
 const CAMPOS_DB = {
   nombre: 'nombre',
   apellido: 'apellido',
+  dni: 'dni',
   fechaNacimiento: 'fecha_nacimiento',
   responsableNombre: 'responsable_nombre',
   responsableTelefono: 'responsable_telefono',
@@ -32,13 +33,14 @@ export async function insertParticipante(participante, db = pool) {
   });
   const { rows } = await db.query(
     `INSERT INTO participantes
-       (id, nombre, apellido, fecha_nacimiento, responsable_nombre, responsable_telefono, observaciones, activo, created_at, updated_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+       (id, nombre, apellido, dni, fecha_nacimiento, responsable_nombre, responsable_telefono, observaciones, activo, created_at, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
      RETURNING *`,
     [
       p.id,
       p.nombre,
       p.apellido,
+      p.dni,
       p.fecha_nacimiento,
       p.responsable_nombre,
       p.responsable_telefono,

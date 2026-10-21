@@ -10,6 +10,7 @@ export default function StudentModal({
 }) {
   const [nombre, setNombre] = useState('');
   const [apellido, setApellido] = useState('');
+  const [dni, setDni] = useState('');
   const [responsableNombre, setResponsableNombre] = useState('');
   const [responsableTelefono, setResponsableTelefono] = useState('');
   const [selectedChoirIds, setSelectedChoirIds] = useState([]);
@@ -18,12 +19,14 @@ export default function StudentModal({
     if (editingStudent) {
       setNombre(editingStudent.nombre || '');
       setApellido(editingStudent.apellido || '');
+      setDni(editingStudent.dni || '');
       setResponsableNombre(editingStudent.responsableNombre || '');
       setResponsableTelefono(editingStudent.responsableTelefono || '');
       setSelectedChoirIds(Array.isArray(editingStudent.coroIds) ? editingStudent.coroIds : []);
     } else {
       setNombre('');
       setApellido('');
+      setDni('');
       setResponsableNombre('');
       setResponsableTelefono('');
       setSelectedChoirIds(choirs[0] ? [choirs[0].id] : []);
@@ -43,12 +46,16 @@ export default function StudentModal({
     if (!nombre.trim() || !apellido.trim()) {
       return alert('El nombre y apellido son obligatorios.');
     }
+    if (!/^\d{7,8}$/.test(dni.trim())) {
+      return alert('El DNI es obligatorio y debe tener 7 u 8 dígitos.');
+    }
 
     const ahora = new Date().toISOString();
     onSave({
       id: editingStudent ? editingStudent.id : newUuid(),
       nombre: nombre.trim(),
       apellido: apellido.trim(),
+      dni: dni.trim(),
       fechaNacimiento: editingStudent?.fechaNacimiento ?? null,
       responsableNombre: responsableNombre.trim() || null,
       responsableTelefono: responsableTelefono.trim() || null,
@@ -90,6 +97,20 @@ export default function StudentModal({
               placeholder="Ej: Gómez"
               value={apellido}
               onChange={(e) => setApellido(e.target.value)}
+              className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 focus:bg-white"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-600 mb-1">DNI *</label>
+            <input
+              type="text"
+              inputMode="numeric"
+              required
+              maxLength={8}
+              placeholder="Sin puntos, ej: 45123456"
+              value={dni}
+              onChange={(e) => setDni(e.target.value.replace(/\D/g, ''))}
               className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 focus:bg-white"
             />
           </div>

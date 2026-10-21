@@ -1,5 +1,5 @@
 // Runner simple: aplica los .sql de esta carpeta en orden y registra los aplicados.
-// Uso: DATABASE_URL=<url directa> node db/migrations/migrate.js
+// Uso: DATABASE_URL_POOLED=<url pooled> node db/migrations/migrate.js
 import 'dotenv/config';
 import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -10,7 +10,7 @@ const { Client } = pg;
 const DIR = path.dirname(fileURLToPath(import.meta.url));
 
 const client = new Client({
-  connectionString: process.env.DATABASE_URL,
+  connectionString: process.env.DATABASE_URL_POOLED,
   ssl: { rejectUnauthorized: false },
 });
 

@@ -36,7 +36,7 @@ function pick(obj, campos) {
 
 // Los schemas del backend son estrictos: se envían solo los campos del contrato.
 const CAMPOS_ALUMNO = [
-  'id', 'nombre', 'apellido', 'fechaNacimiento', 'responsableNombre',
+  'id', 'nombre', 'apellido', 'dni', 'fechaNacimiento', 'responsableNombre',
   'responsableTelefono', 'observaciones', 'activo', 'coroIds',
 ];
 const CAMPOS_CORO = ['id', 'nombre', 'activo', 'diaSemana', 'horario', 'sede'];
@@ -66,9 +66,50 @@ export function construirLote(clase) {
   };
 }
 
+const TIPOS_TEXTO = {
+  [TIPOS.crearAlumno]: 'Crear alumno',
+  [TIPOS.editarAlumno]: 'Editar alumno',
+  [TIPOS.crearCoro]: 'Crear coro',
+  [TIPOS.editarCoro]: 'Editar coro',
+  [TIPOS.syncAsistencia]: 'Asistencia',
+};
+
+// Descripción legible de la operación para el panel de errores.
+export function describirOp(op, choirs = []) {
+  const base = TIPOS_TEXTO[op.tipo] || op.tipo;
+  const p = op.payload || {};
+  switch (op.tipo) {
+    case TIPOS.crearAlumno:
+    case TIPOS.editarAlumno: {
+      const nombre = [p.nombre, p.apellido].filter(Boolean).join(' ') || p.id;
+      return `${base}: ${nombre}`;
+    }
+    case TIPOS.crearCoro:
+    case TIPOS.editarCoro:
+      return `${base}: ${p.nombre || p.id}`;
+    case TIPOS.syncAsistencia: {
+      const clase = p.lote?.clase;
+      const coro = choirs.find((c) => c.id === clase?.coroId);
+      return `${base}${clase?.fecha ? ` del ${clase.fecha}` : ''}${coro ? ` · ${coro.nombre}` : ''}`;
+    }
+    default:
+      return base;
+  }
+}
+
+// Los errores guardados antes de este cambio son strings planos; se normalizan
+// a { mensaje } para que el panel los muestre igual que los nuevos.
+function normalizarError(op) {
+  return {
+    ...op,
+    error: typeof op.error === 'string' ? { mensaje: op.error } : op.error,
+  };
+}
+
 export function useSync({ setChoirs, setStudents, setAttendances }) {
   const [pendientes, setPendientes] = useState(0);
   const [errores, setErrores] = useState(0);
+  const [erroresDetalle, setErroresDetalle] = useState([]);
   const [sincronizando, setSincronizando] = useState(false);
   const enProgreso = useRef(false);
 
@@ -76,6 +117,7 @@ export function useSync({ setChoirs, setStudents, setAttendances }) {
     const actualizar = (cola) => {
       setPendientes(cola.filter((op) => !op.error).length);
       setErrores(cola.filter((op) => op.error).length);
+      setErroresDetalle(cola.filter((op) => op.error).map(normalizarError));
     };
     actualizar(getOutbox());
     return subscribe(actualizar);
@@ -181,7 +223,11 @@ export function useSync({ setChoirs, setStudents, setAttendances }) {
           removeOp(op.id);
         } catch (err) {
           if (err.status >= 400 && err.status < 500) {
-            markError(op.id, err.message);
+            markError(op.id, {
+              mensaje: err.message,
+              status: err.status,
+              detalles: err.detalles ?? null,
+            });
             continue;
           }
           break; // red/5xx: reintentar en la próxima pasada
@@ -198,5 +244,12 @@ export function useSync({ setChoirs, setStudents, setAttendances }) {
     }
   }, [setChoirs, setStudents, setAttendances]);
 
-  return { pendientes, errores, sincronizando, sincronizar };
+  return {
+    pendientes,
+    errores,
+    erroresDetalle,
+    sincronizando,
+    sincronizar,
+    descartarError: removeOp,
+  };
 }

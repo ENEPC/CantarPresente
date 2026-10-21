@@ -37,14 +37,18 @@ export function removeOp(id) {
   notificar();
 }
 
-export function markError(id, mensaje) {
+export function markError(id, error) {
   const op = cola.find((o) => o.id === id);
   if (op) {
-    op.error = mensaje;
+    op.error = error;
     op.intentos += 1;
     persistir();
     notificar();
   }
+}
+
+export function getErrores() {
+  return cola.filter((op) => op.error);
 }
 
 export function subscribe(fn) {
